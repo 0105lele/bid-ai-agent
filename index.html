@@ -3,12 +3,13 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>招投标AI智能体 - 全流程管理平台</title>
-    <script src="https://cdn.tailwindcss.com"></script>
+    <title>智标领航 - AI智能招投标管理平台</title>
+    <script src="https://cdn.tailwindcss.com?plugins=forms"></script>
     <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
     <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
     <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
     <link href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6.0.0/css/all.min.css" rel="stylesheet">
+    <!-- TailwindCSS CDN -->
     <style>
         .fade-in { animation: fadeIn 0.3s ease-in; }
         @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
@@ -20,15 +21,19 @@
         @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.5; } }
         .progress-fill { animation: progressFill 2s ease-in-out forwards; }
         @keyframes progressFill { from { width: 0%; } to { width: 100%; } }
+        .login-bg { background: linear-gradient(135deg, #2563EB 0%, #1D4ED8 50%, #1e3a8a 100%); }
+        .gold-gradient { background: linear-gradient(135deg, #f59e0b, #d97706, #b45309); }
+        .sidebar-scroll::-webkit-scrollbar { width: 4px; }
+        .sidebar-scroll::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 2px; }
+        .sidebar-scroll::-webkit-scrollbar-track { background: transparent; }
+        .module-card { border-left: 4px solid; transition: all 0.3s ease; }
+        .module-card:hover { transform: translateX(4px); box-shadow: 0 4px 12px rgba(0,0,0,0.08); }
     </style>
 </head>
 <body class="bg-gray-100 min-h-screen">
     <div id="root"></div>
-
     <script type="text/babel">
-        const { useState, useEffect, createContext, useContext } = React;
-
-        // ========== 全局状态管理 ==========
+        const { useState, useEffect, createContext, useContext, useCallback } = React;
         const AppContext = createContext();
         const useApp = () => useContext(AppContext);
         const loadData = (key) => { try { return JSON.parse(localStorage.getItem(key)) || []; } catch { return []; } };
@@ -36,130 +41,247 @@
         const saveData = (key, data) => localStorage.setItem(key, JSON.stringify(data));
         const generateId = () => `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
 
-        // ========== 侧边栏组件 ==========
-        const Sidebar = ({ activeModule, setActiveModule, sidebarOpen, setSidebarOpen }) => {
-            const items = [
-                { id: 'dashboard', icon: 'fa-home', label: '首页概览' },
-                { id: 'company', icon: 'fa-building', label: '企业资信库' },
-                { id: 'tender', icon: 'fa-file-alt', label: '招标文件解析' },
-                { id: 'writing', icon: 'fa-pen-fancy', label: '标书写作' },
-                { id: 'chart', icon: 'fa-chart-bar', label: '图表生成', badge: '新' },
-                { id: 'construction', icon: 'fa-hard-hat', label: '工程施工', badge: '新' },
-                { id: 'layout', icon: 'fa-map', label: '平面布置图', badge: '新' },
-                { id: 'imagegen', icon: 'fa-image', label: 'AI生图', badge: '新' },
-                { id: 'template', icon: 'fa-palette', label: '标书模板', badge: '新' },
-                { id: 'check', icon: 'fa-clipboard-check', label: '标书检查' },
-                { id: 'project', icon: 'fa-project-diagram', label: '项目管理' },
-                { id: 'settings', icon: 'fa-cog', label: '系统设置' }
+        // ========== LOGIN PAGE ==========
+        const LoginPage = ({ onLogin }) => {
+            const [loginType, setLoginType] = useState('phone');
+            const [phone, setPhone] = useState('');
+            const [code, setCode] = useState('');
+            const [username, setUsername] = useState('');
+            const [password, setPassword] = useState('');
+            const [countdown, setCountdown] = useState(0);
+            const [loading, setLoading] = useState(false);
+            const sendCode = () => {
+                if (!phone || phone.length < 11) { alert('请输入正确的手机号'); return; }
+                setCountdown(60);
+                const timer = setInterval(() => setCountdown(c => { if (c <= 1) { clearInterval(timer); return 0; } return c - 1; }), 1000);
+            };
+            const handleLogin = async () => {
+                if (loginType === 'phone') { if (!phone || phone.length < 11 || !code) { alert('请填写完整的手机号和验证码'); return; } }
+                else { if (!username || !password) { alert('请填写账号和密码'); return; } }
+                setLoading(true); await new Promise(r => setTimeout(r, 1200));
+                saveData('bid_ai_user', loginType === 'phone' ? { phone, loginType: 'phone' } : { username, loginType: 'password' });
+                setLoading(false); onLogin();
+            };
+            const features = [
+                { icon: 'fa-robot', title: 'AI智能写作', desc: '基于大语言模型，自动生成标书内容' },
+                { icon: 'fa-search-plus', title: '招标文件解读', desc: '十秒定位核心需求，不遗漏关键信息' },
+                { icon: 'fa-clipboard-check', title: '智能查重检查', desc: '26项规则全面审核，确保标书质量' },
+                { icon: 'fa-chart-line', title: '数据驱动决策', desc: '多维度分析，提升中标率' }
             ];
             return (
-                <div className={`${sidebarOpen ? 'w-64' : 'w-20'} bg-white shadow-lg min-h-screen transition-all duration-300 flex flex-col`}>
-                    <div className="h-16 flex items-center justify-center border-b border-gray-200">
-                        {sidebarOpen ? (
-                            <div className="flex items-center">
-                                <i className="fas fa-robot text-2xl text-indigo-600 mr-2"></i>
-                                <span className="font-bold text-lg text-indigo-600">招投标AI助手</span>
+                <div className="min-h-screen flex">
+                    <div className="hidden lg:flex lg:w-1/2 login-bg text-white flex-col justify-between p-12 relative overflow-hidden">
+                        <div className="absolute top-0 right-0 w-96 h-96 bg-white bg-opacity-5 rounded-full -translate-y-1/2 translate-x-1/2"></div>
+                        <div className="absolute bottom-0 left-0 w-72 h-72 bg-white bg-opacity-5 rounded-full translate-y-1/2 -translate-x-1/2"></div>
+                        <div className="relative z-10">
+                            <div className="flex items-center mb-2">
+                                <div className="w-10 h-10 bg-white bg-opacity-20 rounded-xl flex items-center justify-center mr-3"><i className="fas fa-compass text-xl"></i></div>
+                                <span className="text-2xl font-bold">智标领航</span>
                             </div>
-                        ) : (
-                            <i className="fas fa-robot text-2xl text-indigo-600"></i>
-                        )}
+                            <p className="text-blue-200 text-sm ml-13">AI-Powered Bidding Intelligence Platform</p>
+                        </div>
+                        <div className="relative z-10 flex-1 flex flex-col justify-center">
+                            <h1 className="text-5xl font-bold mb-6 leading-tight">使用AI写标书<br/>提高编标效率</h1>
+                            <p className="text-blue-200 text-lg mb-12 max-w-md">全流程智能化招投标管理平台，让AI成为您的投标助手，大幅提升编标效率和中标率。</p>
+                            <div className="grid grid-cols-2 gap-6">
+                                {features.map((f, i) => (
+                                    <div key={i} className="bg-white bg-opacity-10 backdrop-blur-sm rounded-xl p-5">
+                                        <div className="w-10 h-10 bg-white bg-opacity-20 rounded-lg flex items-center justify-center mb-3"><i className={`fas ${f.icon}`}></i></div>
+                                        <h3 className="font-bold mb-1">{f.title}</h3>
+                                        <p className="text-blue-200 text-sm">{f.desc}</p>
+                                    </div>
+                                ))}
+                            </div>
+                        </div>
+                        <div className="relative z-10 text-blue-300 text-sm"><p>&copy; 2024 智标领航 zblh.cn 版权所有</p></div>
                     </div>
-                    <nav className="flex-1 py-4 overflow-y-auto">
-                        {items.map(item => (
-                            <div key={item.id} onClick={() => setActiveModule(item.id)}
-                                className={`flex items-center px-6 py-3 cursor-pointer transition ${activeModule === item.id ? 'bg-indigo-50 text-indigo-600 border-r-4 border-indigo-600' : 'text-gray-600 hover:bg-gray-50'}`}>
-                                <i className={`fas ${item.icon} w-5`}></i>
-                                {sidebarOpen && <span className="ml-3 flex-1">{item.label}</span>}
-                                {sidebarOpen && item.badge && <span className="px-1.5 py-0.5 text-xs bg-red-500 text-white rounded">{item.badge}</span>}
+                    <div className="flex-1 flex items-center justify-center bg-white p-8">
+                        <div className="w-full max-w-md">
+                            <div className="lg:hidden flex items-center mb-8">
+                                <div className="w-10 h-10 bg-blue-600 rounded-xl flex items-center justify-center mr-3"><i className="fas fa-compass text-white text-xl"></i></div>
+                                <span className="text-2xl font-bold text-blue-600">智标领航</span>
                             </div>
-                        ))}
-                    </nav>
-                    <div className="p-4 border-t border-gray-200">
-                        <button onClick={() => setSidebarOpen(!sidebarOpen)} className="w-full flex items-center justify-center py-2 text-gray-400 hover:text-gray-600 transition">
-                            <i className={`fas ${sidebarOpen ? 'fa-chevron-left' : 'fa-chevron-right'}`}></i>
-                        </button>
+                            <h2 className="text-3xl font-bold text-gray-800 mb-2">欢迎登录</h2>
+                            <p className="text-gray-500 mb-8">登录后即可使用全部AI招投标功能</p>
+                            <div className="flex mb-8 bg-gray-100 rounded-xl p-1">
+                                <button onClick={() => setLoginType('phone')} className={`flex-1 py-3 rounded-lg text-sm font-medium transition ${loginType === 'phone' ? 'bg-white text-blue-600 shadow-sm' : 'text-gray-500'}`}><i className="fas fa-mobile-alt mr-2"></i>手机号登录</button>
+                                <button onClick={() => setLoginType('password')} className={`flex-1 py-3 rounded-lg text-sm font-medium transition ${loginType === 'password' ? 'bg-white text-blue-600 shadow-sm' : 'text-gray-500'}`}><i className="fas fa-lock mr-2"></i>账号密码</button>
+                            </div>
+                            {loginType === 'phone' ? (
+                                <div className="space-y-5">
+                                    <div><label className="block text-sm font-medium text-gray-700 mb-2">手机号</label><div className="relative"><i className="fas fa-mobile-alt absolute left-4 top-1/2 -translate-y-1/2 text-gray-400"></i><input type="tel" value={phone} onChange={e => setPhone(e.target.value)} placeholder="请输入手机号" className="w-full pl-12 pr-4 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition" /></div></div>
+                                    <div><label className="block text-sm font-medium text-gray-700 mb-2">验证码</label><div className="flex gap-3"><div className="relative flex-1"><i className="fas fa-shield-alt absolute left-4 top-1/2 -translate-y-1/2 text-gray-400"></i><input type="text" value={code} onChange={e => setCode(e.target.value)} placeholder="请输入验证码" className="w-full pl-12 pr-4 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition" /></div><button onClick={sendCode} disabled={countdown > 0} className={`px-6 py-3 rounded-xl text-sm font-medium whitespace-nowrap transition ${countdown > 0 ? 'bg-gray-100 text-gray-400' : 'bg-blue-50 text-blue-600 hover:bg-blue-100'}`}>{countdown > 0 ? `${countdown}s` : '获取验证码'}</button></div></div>
+                                </div>
+                            ) : (
+                                <div className="space-y-5">
+                                    <div><label className="block text-sm font-medium text-gray-700 mb-2">账号</label><div className="relative"><i className="fas fa-user absolute left-4 top-1/2 -translate-y-1/2 text-gray-400"></i><input type="text" value={username} onChange={e => setUsername(e.target.value)} placeholder="请输入账号" className="w-full pl-12 pr-4 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition" /></div></div>
+                                    <div><label className="block text-sm font-medium text-gray-700 mb-2">密码</label><div className="relative"><i className="fas fa-lock absolute left-4 top-1/2 -translate-y-1/2 text-gray-400"></i><input type="password" value={password} onChange={e => setPassword(e.target.value)} placeholder="请输入密码" className="w-full pl-12 pr-4 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition" /></div></div>
+                                    <div className="flex items-center justify-between"><label className="flex items-center text-sm text-gray-600"><input type="checkbox" className="mr-2 rounded" /> 记住登录</label><a href="#" className="text-sm text-blue-600 hover:text-blue-700">忘记密码？</a></div>
+                                </div>
+                            )}
+                            <button onClick={handleLogin} disabled={loading} className="w-full mt-8 py-3.5 bg-blue-600 text-white rounded-xl font-medium hover:bg-blue-700 transition disabled:opacity-50 disabled:cursor-not-allowed shadow-lg shadow-blue-200">{loading ? <><i className="fas fa-spinner fa-spin mr-2"></i>登录中...</> : '登 录'}</button>
+                            <div className="mt-6 text-center text-sm text-gray-500">还没有账号？<a href="#" className="text-blue-600 font-medium hover:text-blue-700">立即注册</a></div>
+                            <div className="mt-8 pt-6 border-t border-gray-100"><p className="text-xs text-gray-400 text-center">登录即表示同意 <a href="#" className="text-blue-600">用户协议</a> 和 <a href="#" className="text-blue-600">隐私政策</a></p></div>
+                        </div>
                     </div>
                 </div>
             );
         };
 
-        // ========== 首页仪表盘 ==========
+        // ========== SIDEBAR ==========
+        const Sidebar = ({ activeModule, setActiveModule, sidebarOpen, setSidebarOpen }) => {
+            const [expandedGroups, setExpandedGroups] = useState({ resource: true });
+            const toggleGroup = (group) => setExpandedGroups(prev => ({ ...prev, [group]: !prev[group] }));
+            const navGroups = [
+                { title: '核心功能', items: [
+                    { id: 'writing', icon: 'fa-pen-fancy', label: '标书写作', color: '#8b5cf6' },
+                    { id: 'tender', icon: 'fa-file-alt', label: '招标解读', color: '#10b981' },
+                    { id: 'check', icon: 'fa-clipboard-check', label: '标书查重', color: '#f59e0b' }
+                ]},
+                { title: '资料库', expandable: true, groupKey: 'resource', items: [
+                    { id: 'knowledge', icon: 'fa-book', label: '知识库', color: '#3b82f6' },
+                    { id: 'products', icon: 'fa-box', label: '产品库', color: '#8b5cf6' },
+                    { id: 'gallery', icon: 'fa-images', label: '图库', color: '#ec4899' }
+                ]},
+                { title: 'AI工具', items: [
+                    { id: 'chart', icon: 'fa-chart-bar', label: '图表生成', color: '#f97316' },
+                    { id: 'construction', icon: 'fa-hard-hat', label: '工程施工', color: '#eab308' },
+                    { id: 'layout', icon: 'fa-map', label: '平面布置图', color: '#06b6d4' },
+                    { id: 'imagegen', icon: 'fa-image', label: 'AI生图', color: '#ec4899' }
+                ]},
+                { title: '管理中心', items: [
+                    { id: 'mybids', icon: 'fa-file-signature', label: '我的标书', color: '#6366f1' },
+                    { id: 'project', icon: 'fa-project-diagram', label: '项目管理', color: '#ec4899' },
+                    { id: 'business', icon: 'fa-file-invoice-dollar', label: '商务标助手', color: '#14b8a6' },
+                    { id: 'opportunities', icon: 'fa-bullhorn', label: '标讯商机', color: '#f97316' }
+                ]},
+                { title: '系统', items: [
+                    { id: 'template', icon: 'fa-palette', label: '标书模板', color: '#6366f1' },
+                    { id: 'settings', icon: 'fa-cog', label: '系统设置', color: '#6b7280' }
+                ]}
+            ];
+            return (
+                <div className={`${sidebarOpen ? 'w-64' : 'w-20'} bg-white shadow-lg min-h-screen transition-all duration-300 flex flex-col border-r border-gray-200`}>
+                    <div className="h-16 flex items-center justify-center border-b border-gray-100">
+                        {sidebarOpen ? (
+                            <div className="flex items-center">
+                                <div className="w-9 h-9 bg-blue-600 rounded-xl flex items-center justify-center mr-2.5"><i className="fas fa-compass text-white text-lg"></i></div>
+                                <span className="font-bold text-lg text-blue-600">智标领航</span>
+                            </div>
+                        ) : (
+                            <div className="w-9 h-9 bg-blue-600 rounded-xl flex items-center justify-center"><i className="fas fa-compass text-white text-lg"></i></div>
+                        )}
+                    </div>
+                    <nav className="flex-1 py-3 overflow-y-auto sidebar-scroll">
+                        <div onClick={() => setActiveModule('dashboard')} className={`flex items-center px-5 py-2.5 cursor-pointer transition mx-2 rounded-lg mb-1 ${activeModule === 'dashboard' ? 'bg-blue-50 text-blue-600' : 'text-gray-600 hover:bg-gray-50'}`}><i className="fas fa-home w-5 text-center"></i>{sidebarOpen && <span className="ml-3 text-sm font-medium">首页概览</span>}</div>
+                        <div onClick={() => setActiveModule('company')} className={`flex items-center px-5 py-2.5 cursor-pointer transition mx-2 rounded-lg mb-1 ${activeModule === 'company' ? 'bg-blue-50 text-blue-600' : 'text-gray-600 hover:bg-gray-50'}`}><i className="fas fa-building w-5 text-center"></i>{sidebarOpen && <span className="ml-3 text-sm font-medium">企业资信库</span>}</div>
+                        {navGroups.map((group, gi) => (
+                            <div key={gi} className="mt-3">
+                                {sidebarOpen && (
+                                    <div className="px-5 mb-1 flex items-center justify-between">
+                                        <span className="text-xs text-gray-400 font-medium tracking-wider">{group.title}</span>
+                                        {group.expandable && (<button onClick={() => toggleGroup(group.groupKey)} className="text-gray-400 hover:text-gray-600"><i className={`fas fa-chevron-${expandedGroups[group.groupKey] ? 'down' : 'right'} text-xs`}></i></button>)}
+                                    </div>
+                                )}
+                                {(!group.expandable || expandedGroups[group.groupKey]) && group.items.map(item => (
+                                    <div key={item.id} onClick={() => setActiveModule(item.id)} className={`flex items-center px-5 py-2.5 cursor-pointer transition mx-2 rounded-lg mb-0.5 ${activeModule === item.id ? 'bg-blue-50 text-blue-600' : 'text-gray-600 hover:bg-gray-50'}`}>
+                                        <i className={`fas ${item.icon} w-5 text-center`} style={{ color: activeModule === item.id ? '#2563EB' : item.color }}></i>
+                                        {sidebarOpen && <span className="ml-3 text-sm">{item.label}</span>}
+                                    </div>
+                                ))}
+                            </div>
+                        ))}
+                    </nav>
+                    {sidebarOpen && (<div className="px-4 mb-3"><button className="w-full py-3 gold-gradient text-white rounded-xl font-medium text-sm shadow-lg hover:shadow-xl transition"><i className="fas fa-crown mr-2"></i>了解企业版</button></div>)}
+                    <div className="p-3 border-t border-gray-100"><button onClick={() => setSidebarOpen(!sidebarOpen)} className="w-full flex items-center justify-center py-2 text-gray-400 hover:text-gray-600 transition rounded-lg hover:bg-gray-50"><i className={`fas ${sidebarOpen ? 'fa-chevron-left' : 'fa-chevron-right'} text-sm`}></i></button></div>
+                </div>
+            );
+        };
+
+        // ========== DASHBOARD ==========
         const Dashboard = ({ setActiveModule }) => {
             const { companies, tenderData, bids, projects } = useApp();
-            const modules = [
-                { id: 'company', icon: 'fa-building', label: '企业资信库', desc: '管理企业资质、证书和业绩', color: 'blue' },
-                { id: 'tender', icon: 'fa-file-alt', label: '招标文件解析', desc: 'AI解读，十秒定位核心需求', color: 'green' },
-                { id: 'writing', icon: 'fa-pen-fancy', label: '标书写作', desc: '三种模式，精准响应评分点', color: 'purple' },
-                { id: 'chart', icon: 'fa-chart-bar', label: '图表生成', desc: '横道图与网络图一键生成', color: 'orange' },
-                { id: 'construction', icon: 'fa-hard-hat', label: '工程施工', desc: '工程附表、施工方案绘制', color: 'yellow' },
-                { id: 'layout', icon: 'fa-map', label: '平面布置图', desc: '施工平面布置图一键生成', color: 'cyan' },
-                { id: 'imagegen', icon: 'fa-image', label: 'AI生图', desc: '批量配图、组织架构图生成', color: 'pink' },
-                { id: 'template', icon: 'fa-palette', label: '标书模板', desc: '精品文档模型、AI模板市场', color: 'indigo' },
-                { id: 'check', icon: 'fa-clipboard-check', label: '标书检查', desc: '26项规则全面审核', color: 'orange' },
-                { id: 'project', icon: 'fa-project-diagram', label: '项目管理', desc: '跟踪项目进度和任务', color: 'pink' },
-                { id: 'settings', icon: 'fa-cog', label: '系统设置', desc: '配置偏好和数据管理', color: 'gray' }
-            ];
+            const recentProjects = projects.slice(-5).reverse();
+            const recentBids = bids.slice(-5).reverse();
             const stats = [
-                { name: '企业信息', value: companies.length, icon: 'fa-building', color: 'blue' },
-                { name: '招标文件', value: tenderData ? 1 : 0, icon: 'fa-file-alt', color: 'green' },
-                { name: '标书历史', value: bids.length, icon: 'fa-file-signature', color: 'purple' },
-                { name: '跟踪项目', value: projects.length, icon: 'fa-project-diagram', color: 'orange' }
+                { name: '企业信息', value: companies.length, icon: 'fa-building', bg: 'bg-blue-50', iconColor: 'text-blue-600' },
+                { name: '招标文件', value: tenderData ? 1 : 0, icon: 'fa-file-alt', bg: 'bg-green-50', iconColor: 'text-green-600' },
+                { name: '标书历史', value: bids.length, icon: 'fa-file-signature', bg: 'bg-purple-50', iconColor: 'text-purple-600' },
+                { name: '跟踪项目', value: projects.length, icon: 'fa-project-diagram', bg: 'bg-orange-50', iconColor: 'text-orange-600' }
+            ];
+            const modules = [
+                { id: 'writing', icon: 'fa-pen-fancy', label: '标书写作', desc: '三种模式，精准响应评分点', color: '#8b5cf6' },
+                { id: 'tender', icon: 'fa-file-alt', label: '招标解读', desc: 'AI解读，十秒定位核心需求', color: '#10b981' },
+                { id: 'check', icon: 'fa-clipboard-check', label: '标书查重', desc: '上传文件进行相似度检测', color: '#f59e0b' },
+                { id: 'business', icon: 'fa-file-invoice-dollar', label: '商务标助手', desc: '自动生成商务标文件', color: '#14b8a6' },
+                { id: 'opportunities', icon: 'fa-bullhorn', label: '标讯商机', desc: '实时招标信息推送', color: '#f97316' },
+                { id: 'knowledge', icon: 'fa-book', label: '知识库', desc: '管理标书知识文档', color: '#3b82f6' },
+                { id: 'products', icon: 'fa-box', label: '产品库', desc: '管理产品信息和参数', color: '#8b5cf6' },
+                { id: 'gallery', icon: 'fa-images', label: '图库', desc: '管理标书图片素材', color: '#ec4899' },
+                { id: 'chart', icon: 'fa-chart-bar', label: '图表生成', desc: '横道图与网络图一键生成', color: '#f97316' },
+                { id: 'construction', icon: 'fa-hard-hat', label: '工程施工', desc: '工程附表、施工方案绘制', color: '#eab308' }
             ];
             return (
                 <div className="p-6 fade-in">
-                    <div className="bg-gradient-to-r from-indigo-600 to-purple-600 rounded-2xl p-8 mb-8 text-white">
-                        <h2 className="text-3xl font-bold mb-2">欢迎使用招投标AI智能体</h2>
-                        <p className="text-indigo-100 mb-6">全流程智能化招投标管理，提升投标效率与中标率</p>
-                        <div className="flex gap-4">
-                            <button onClick={() => setActiveModule('tender')} className="px-6 py-3 bg-white text-indigo-600 rounded-lg font-medium hover:bg-indigo-50 transition">
-                                <i className="fas fa-upload mr-2"></i>上传招标文件
-                            </button>
-                            <button onClick={() => setActiveModule('company')} className="px-6 py-3 bg-indigo-500 text-white rounded-lg font-medium hover:bg-indigo-400 transition">
-                                <i className="fas fa-plus mr-2"></i>完善企业信息
-                            </button>
+                    <div className="bg-gradient-to-r from-blue-600 to-blue-700 rounded-2xl p-8 mb-8 text-white relative overflow-hidden">
+                        <div className="absolute top-0 right-0 w-64 h-64 bg-white bg-opacity-5 rounded-full -translate-y-1/2 translate-x-1/4"></div>
+                        <div className="absolute bottom-0 right-1/3 w-40 h-40 bg-white bg-opacity-5 rounded-full translate-y-1/2"></div>
+                        <div className="relative z-10">
+                            <h2 className="text-3xl font-bold mb-2">欢迎使用智标领航</h2>
+                            <p className="text-blue-100 mb-6">AI驱动的全流程招投标管理，提升编标效率与中标率</p>
+                            <div className="flex gap-4">
+                                <button onClick={() => setActiveModule('tender')} className="px-6 py-3 bg-white text-blue-600 rounded-lg font-medium hover:bg-blue-50 transition shadow-lg"><i className="fas fa-upload mr-2"></i>上传招标文件</button>
+                                <button onClick={() => setActiveModule('company')} className="px-6 py-3 bg-blue-500 text-white rounded-lg font-medium hover:bg-blue-400 transition"><i className="fas fa-plus mr-2"></i>完善企业信息</button>
+                            </div>
                         </div>
                     </div>
                     <div className="grid grid-cols-4 gap-4 mb-8">
                         {stats.map((stat, i) => (
                             <div key={i} className="bg-white rounded-xl shadow-sm p-6 card-hover">
                                 <div className="flex items-center">
-                                    <div className={`w-14 h-14 rounded-xl bg-${stat.color}-100 flex items-center justify-center mr-4`}>
-                                        <i className={`fas ${stat.icon} text-2xl text-${stat.color}-600`}></i>
-                                    </div>
-                                    <div>
-                                        <div className="text-3xl font-bold text-gray-800">{stat.value}</div>
-                                        <div className="text-sm text-gray-500">{stat.name}</div>
-                                    </div>
+                                    <div className={`w-14 h-14 rounded-xl ${stat.bg} flex items-center justify-center mr-4`}><i className={`fas ${stat.icon} text-2xl ${stat.iconColor}`}></i></div>
+                                    <div><div className="text-3xl font-bold text-gray-800">{stat.value}</div><div className="text-sm text-gray-500">{stat.name}</div></div>
                                 </div>
                             </div>
                         ))}
                     </div>
-                    <h3 className="text-xl font-bold text-gray-800 mb-4">功能模块</h3>
-                    <div className="grid grid-cols-3 gap-6 mb-8">
+                    <h3 className="text-lg font-bold text-gray-800 mb-4">功能模块</h3>
+                    <div className="grid grid-cols-2 gap-4 mb-8">
                         {modules.map(mod => (
-                            <div key={mod.id} onClick={() => setActiveModule(mod.id)}
-                                className={`bg-white rounded-xl shadow-sm p-6 cursor-pointer card-hover border-t-4 border-${mod.color}-500`}>
-                                <div className={`w-12 h-12 rounded-lg bg-${mod.color}-100 flex items-center justify-center mb-4`}>
-                                    <i className={`fas ${mod.icon} text-xl text-${mod.color}-600`}></i>
+                            <div key={mod.id} onClick={() => setActiveModule(mod.id)} className="module-card bg-white rounded-xl shadow-sm p-5 cursor-pointer" style={{ borderLeftColor: mod.color }}>
+                                <div className="flex items-center">
+                                    <div className="w-11 h-11 rounded-lg flex items-center justify-center mr-4" style={{ backgroundColor: mod.color + '15' }}><i className={`fas ${mod.icon} text-lg`} style={{ color: mod.color }}></i></div>
+                                    <div><h4 className="font-bold text-gray-800">{mod.label}</h4><p className="text-sm text-gray-500">{mod.desc}</p></div>
+                                    <i className="fas fa-chevron-right text-gray-300 ml-auto"></i>
                                 </div>
-                                <h4 className="font-bold text-lg text-gray-800 mb-2">{mod.label}</h4>
-                                <p className="text-sm text-gray-500">{mod.desc}</p>
                             </div>
                         ))}
+                    </div>
+                    <div className="grid grid-cols-2 gap-6 mb-8">
+                        <div className="bg-white rounded-xl shadow-sm p-6">
+                            <div className="flex items-center justify-between mb-4"><h4 className="font-bold text-gray-800"><i className="fas fa-folder-open mr-2 text-blue-600"></i>最近项目</h4><button onClick={() => setActiveModule('project')} className="text-sm text-blue-600 hover:text-blue-700">查看全部</button></div>
+                            {recentProjects.length > 0 ? (<div className="space-y-3">{recentProjects.map(p => (<div key={p.id} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg hover:bg-gray-100 transition cursor-pointer"><div><div className="font-medium text-sm">{p.name}</div><div className="text-xs text-gray-500">{p.client}</div></div><span className="px-2 py-1 text-xs rounded bg-blue-100 text-blue-700">{p.stage}</span></div>))}</div>) : (<p className="text-sm text-gray-400 text-center py-8">暂无项目</p>)}
+                        </div>
+                        <div className="bg-white rounded-xl shadow-sm p-6">
+                            <div className="flex items-center justify-between mb-4"><h4 className="font-bold text-gray-800"><i className="fas fa-file-signature mr-2 text-green-600"></i>最近标书</h4><button onClick={() => setActiveModule('mybids')} className="text-sm text-blue-600 hover:text-blue-700">查看全部</button></div>
+                            {recentBids.length > 0 ? (<div className="space-y-3">{recentBids.map(b => (<div key={b.id} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg hover:bg-gray-100 transition cursor-pointer"><div><div className="font-medium text-sm">{b.tenderName}</div><div className="text-xs text-gray-500">{b.type === 'business' ? '商务标' : '技术标'}</div></div><span className="text-xs text-gray-400">{new Date(b.createdAt).toLocaleDateString('zh-CN')}</span></div>))}</div>) : (<p className="text-sm text-gray-400 text-center py-8">暂无标书</p>)}
+                        </div>
                     </div>
                     <div className="bg-white rounded-xl shadow-sm p-6">
                         <h4 className="font-bold text-gray-800 mb-4"><i className="fas fa-bolt mr-2 text-yellow-500"></i>快捷操作</h4>
-                        <div className="flex gap-4">
-                            <button onClick={() => setActiveModule('writing')} className="px-4 py-2 bg-purple-100 text-purple-700 rounded-lg hover:bg-purple-200 transition"><i className="fas fa-magic mr-2"></i>AI生成标书</button>
-                            <button onClick={() => setActiveModule('check')} className="px-4 py-2 bg-orange-100 text-orange-700 rounded-lg hover:bg-orange-200 transition"><i className="fas fa-clipboard-check mr-2"></i>标书检查</button>
-                            <button onClick={() => setActiveModule('project')} className="px-4 py-2 bg-pink-100 text-pink-700 rounded-lg hover:bg-pink-200 transition"><i className="fas fa-plus mr-2"></i>新建项目</button>
+                        <div className="flex gap-3">
+                            <button onClick={() => setActiveModule('writing')} className="px-5 py-2.5 bg-purple-50 text-purple-700 rounded-lg hover:bg-purple-100 transition text-sm font-medium"><i className="fas fa-magic mr-2"></i>AI生成标书</button>
+                            <button onClick={() => setActiveModule('check')} className="px-5 py-2.5 bg-orange-50 text-orange-700 rounded-lg hover:bg-orange-100 transition text-sm font-medium"><i className="fas fa-clipboard-check mr-2"></i>标书查重</button>
+                            <button onClick={() => setActiveModule('business')} className="px-5 py-2.5 bg-teal-50 text-teal-700 rounded-lg hover:bg-teal-100 transition text-sm font-medium"><i className="fas fa-file-invoice-dollar mr-2"></i>商务标助手</button>
+                            <button onClick={() => setActiveModule('opportunities')} className="px-5 py-2.5 bg-amber-50 text-amber-700 rounded-lg hover:bg-amber-100 transition text-sm font-medium"><i className="fas fa-bullhorn mr-2"></i>标讯商机</button>
+                            <button onClick={() => setActiveModule('project')} className="px-5 py-2.5 bg-pink-50 text-pink-700 rounded-lg hover:bg-pink-100 transition text-sm font-medium"><i className="fas fa-plus mr-2"></i>新建项目</button>
                         </div>
                     </div>
                 </div>
             );
         };
 
-        // ========== 模块01: 企业资信库 ==========
+        // ========== COMPANY MODULE ==========
         const CompanyModule = () => {
             const { companies, setCompanies } = useApp();
             const [showModal, setShowModal] = useState(false);
@@ -168,45 +290,24 @@
             const handleSave = () => {
                 if (!form.name) return;
                 const company = { id: generateId(), ...form, certificates: [], projects: [], createdAt: new Date().toISOString() };
-                const updated = [...companies, company];
-                setCompanies(updated); saveData('bid_ai_companies', updated); setShowModal(false);
+                const updated = [...companies, company]; setCompanies(updated); saveData('bid_ai_companies', updated); setShowModal(false);
                 setForm({ name: '', taxNumber: '', legalPerson: '', phone: '', capital: '', address: '' });
             };
-            const handleDelete = (id) => {
-                if (confirm('确定删除该企业？')) {
-                    const updated = companies.filter(c => c.id !== id);
-                    setCompanies(updated); saveData('bid_ai_companies', updated); setSelectedCompany(null);
-                }
-            };
+            const handleDelete = (id) => { if (confirm('确定删除该企业？')) { const updated = companies.filter(c => c.id !== id); setCompanies(updated); saveData('bid_ai_companies', updated); setSelectedCompany(null); } };
             return (
                 <div className="p-6 fade-in">
-                    <div className="flex items-center justify-between mb-6">
-                        <h2 className="text-2xl font-bold text-gray-800"><i className="fas fa-building mr-3 text-blue-600"></i>企业资信库</h2>
-                        <button onClick={() => setShowModal(true)} className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"><i className="fas fa-plus mr-2"></i>添加企业</button>
-                    </div>
+                    <div className="flex items-center justify-between mb-6"><h2 className="text-2xl font-bold text-gray-800"><i className="fas fa-building mr-3 text-blue-600"></i>企业资信库</h2><button onClick={() => setShowModal(true)} className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"><i className="fas fa-plus mr-2"></i>添加企业</button></div>
                     <div className="grid grid-cols-3 gap-6">
                         <div className="bg-white rounded-xl shadow p-4">
                             <h3 className="font-semibold mb-4">企业列表 ({companies.length})</h3>
-                            {companies.length === 0 ? (
-                                <p className="text-gray-400 text-center py-8">暂无企业，点击上方按钮添加</p>
-                            ) : (
-                                <div className="space-y-2">
-                                    {companies.map(c => (
-                                        <div key={c.id} onClick={() => setSelectedCompany(c)} className={`p-3 rounded-lg cursor-pointer transition ${selectedCompany?.id === c.id ? 'bg-blue-50 border border-blue-200' : 'hover:bg-gray-50'}`}>
-                                            <div className="font-medium">{c.name}</div>
-                                            <div className="text-sm text-gray-500">{c.taxNumber}</div>
-                                        </div>
-                                    ))}
-                                </div>
+                            {companies.length === 0 ? <p className="text-gray-400 text-center py-8">暂无企业</p> : (
+                                <div className="space-y-2">{companies.map(c => (<div key={c.id} onClick={() => setSelectedCompany(c)} className={`p-3 rounded-lg cursor-pointer transition ${selectedCompany?.id === c.id ? 'bg-blue-50 border border-blue-200' : 'hover:bg-gray-50'}`}><div className="font-medium">{c.name}</div><div className="text-sm text-gray-500">{c.taxNumber}</div></div>))}</div>
                             )}
                         </div>
                         <div className="col-span-2 bg-white rounded-xl shadow p-6">
                             {selectedCompany ? (
                                 <div>
-                                    <div className="flex justify-between items-start mb-6">
-                                        <div><h3 className="text-xl font-bold">{selectedCompany.name}</h3><p className="text-gray-500">{selectedCompany.taxNumber}</p></div>
-                                        <button onClick={() => handleDelete(selectedCompany.id)} className="text-red-500 hover:text-red-700"><i className="fas fa-trash"></i></button>
-                                    </div>
+                                    <div className="flex justify-between items-start mb-6"><div><h3 className="text-xl font-bold">{selectedCompany.name}</h3><p className="text-gray-500">{selectedCompany.taxNumber}</p></div><button onClick={() => handleDelete(selectedCompany.id)} className="text-red-500 hover:text-red-700"><i className="fas fa-trash"></i></button></div>
                                     <div className="grid grid-cols-2 gap-4">
                                         <div><span className="text-gray-500">法定代表人：</span>{selectedCompany.legalPerson}</div>
                                         <div><span className="text-gray-500">联系电话：</span>{selectedCompany.phone}</div>
@@ -220,9 +321,7 @@
                                         <div className="text-center p-4 bg-orange-50 rounded-lg"><div className="text-2xl font-bold text-orange-600">良好</div><div className="text-sm text-gray-500">信用状态</div></div>
                                     </div>
                                 </div>
-                            ) : (
-                                <div className="text-center py-16 text-gray-400"><i className="fas fa-building text-4xl mb-4"></i><p>请从左侧选择一个企业查看详情</p></div>
-                            )}
+                            ) : <div className="text-center py-16 text-gray-400"><i className="fas fa-building text-4xl mb-4"></i><p>请从左侧选择一个企业查看详情</p></div>}
                         </div>
                     </div>
                     {showModal && (
@@ -237,10 +336,7 @@
                                     <input type="text" placeholder="注册资本（万元）" value={form.capital} onChange={e => setForm({...form, capital: e.target.value})} className="w-full px-3 py-2 border rounded-lg" />
                                     <input type="text" placeholder="注册地址" value={form.address} onChange={e => setForm({...form, address: e.target.value})} className="w-full px-3 py-2 border rounded-lg" />
                                 </div>
-                                <div className="flex justify-end gap-3 mt-6">
-                                    <button onClick={() => setShowModal(false)} className="px-4 py-2 text-gray-600 hover:bg-gray-100 rounded-lg">取消</button>
-                                    <button onClick={handleSave} className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700">保存</button>
-                                </div>
+                                <div className="flex justify-end gap-3 mt-6"><button onClick={() => setShowModal(false)} className="px-4 py-2 text-gray-600 hover:bg-gray-100 rounded-lg">取消</button><button onClick={handleSave} className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700">保存</button></div>
                             </div>
                         </div>
                     )}
@@ -248,33 +344,15 @@
             );
         };
 
-        // ========== 模块02: 招标文件解析 ==========
+        // ========== TENDER MODULE ==========
         const TenderModule = () => {
             const { tenderData, setTenderData } = useApp();
             const [parsing, setParsing] = useState(false);
             const [activeCategory, setActiveCategory] = useState('goods');
             const [activeTab, setActiveTab] = useState('basic');
-            const categories = [
-                { id: 'goods', label: '货物类', icon: 'fa-box', color: 'blue', desc: '设备、材料、商品等采购' },
-                { id: 'engineering', label: '工程类', icon: 'fa-hard-hat', color: 'orange', desc: '建筑、安装、装修等工程' },
-                { id: 'service', label: '服务类', icon: 'fa-handshake', color: 'purple', desc: '咨询、运维、培训等服务' }
-            ];
-            const tabs = [
-                { id: 'basic', label: '基础信息', icon: 'fa-info-circle' },
-                { id: 'qualification', label: '资格要求', icon: 'fa-certificate' },
-                { id: 'evaluation', label: '评审要求', icon: 'fa-clipboard-check' },
-                { id: 'scoring', label: '商务评分', icon: 'fa-star' },
-                { id: 'disqualification', label: '无效标与废标项', icon: 'fa-ban' },
-                { id: 'requirements', label: '投标文件要求', icon: 'fa-file-alt' },
-                { id: 'documents', label: '应标需提交文件', icon: 'fa-folder-open' },
-                { id: 'review', label: '招标文件审查', icon: 'fa-search' },
-                { id: 'process', label: '开评定标流程', icon: 'fa-tasks' }
-            ];
-            const categoryData = {
-                goods: { client: '某市政府采购中心', budget: 500, qualification: '货物经营许可证', capitalRequirement: 100, requirements: ['具备有效的营业执照', '具有货物供应能力', '提供产品质检报告', '近三年无重大违法记录'] },
-                engineering: { client: '某市住建局', budget: 2000, qualification: '建筑工程施工总承包一级', capitalRequirement: 5000, requirements: ['具备相应施工资质', '具有安全生产许可证', '项目经理具备一级建造师资格', '近三年有类似工程业绩'] },
-                service: { client: '某市信息中心', budget: 300, qualification: '信息系统集成及服务资质', capitalRequirement: 200, requirements: ['具备相关服务资质', '具有专业技术团队', '提供完善的服务方案', '具有良好的服务信誉'] }
-            };
+            const categories = [{ id: 'goods', label: '货物类', icon: 'fa-box', desc: '设备、材料、商品等采购' }, { id: 'engineering', label: '工程类', icon: 'fa-hard-hat', desc: '建筑、安装、装修等工程' }, { id: 'service', label: '服务类', icon: 'fa-handshake', desc: '咨询、运维、培训等服务' }];
+            const tabs = [{ id: 'basic', label: '基础信息', icon: 'fa-info-circle' }, { id: 'qualification', label: '资格要求', icon: 'fa-certificate' }, { id: 'evaluation', label: '评审要求', icon: 'fa-clipboard-check' }, { id: 'scoring', label: '商务评分', icon: 'fa-star' }, { id: 'disqualification', label: '无效标与废标项', icon: 'fa-ban' }, { id: 'requirements', label: '投标文件要求', icon: 'fa-file-alt' }, { id: 'documents', label: '应标需提交文件', icon: 'fa-folder-open' }, { id: 'review', label: '招标文件审查', icon: 'fa-search' }, { id: 'process', label: '开评定标流程', icon: 'fa-tasks' }];
+            const categoryData = { goods: { client: '某市政府采购中心', budget: 500, qualification: '货物经营许可证', capitalRequirement: 100, requirements: ['具备有效的营业执照', '具有货物供应能力', '提供产品质检报告', '近三年无重大违法记录'] }, engineering: { client: '某市住建局', budget: 2000, qualification: '建筑工程施工总承包一级', capitalRequirement: 5000, requirements: ['具备相应施工资质', '具有安全生产许可证', '项目经理具备一级建造师资格', '近三年有类似工程业绩'] }, service: { client: '某市信息中心', budget: 300, qualification: '信息系统集成及服务资质', capitalRequirement: 200, requirements: ['具备相关服务资质', '具有专业技术团队', '提供完善的服务方案', '具有良好的服务信誉'] } };
             const parsedData = {
                 basic: { title: '基础信息', content: [{ label: '项目名称', value: '某市智慧政务平台建设项目' }, { label: '招标编号', value: 'ZB2024-001' }, { label: '招标单位', value: '某市大数据管理局' }, { label: '项目预算', value: '人民币 500 万元' }, { label: '招标方式', value: '公开招标' }, { label: '投标截止', value: '2024年6月30日 09:00' }, { label: '开标时间', value: '2024年6月30日 09:30' }, { label: '项目周期', value: '12个月' }] },
                 qualification: { title: '资格要求', content: ['具有独立承担民事责任的能力', '具有良好的商业信誉和健全的财务会计制度', '具有履行合同所必需的设备和专业技术能力', '有依法缴纳税收和社会保障资金的良好记录', '参加政府采购活动前三年内，在经营活动中没有重大违法记录', '具备有效的营业执照和相关资质证书'] },
@@ -286,62 +364,17 @@
                 review: { title: '招标文件审查要点', content: ['审查招标文件的完整性和规范性', '审查资格要求的合理性', '审查评分标准的公平性', '审查合同条款的合法性', '审查技术要求的明确性', '审查投标截止时间的合理性'] },
                 process: { title: '开评定标流程', content: [{ step: 1, name: '开标', desc: '当众拆封投标文件，宣读投标报价' }, { step: 2, name: '资格审查', desc: '审查投标人资格是否符合要求' }, { step: 3, name: '符合性审查', desc: '审查投标文件是否符合招标文件要求' }, { step: 4, name: '详细评审', desc: '对通过审查的投标进行技术和商务评审' }, { step: 5, name: '评分汇总', desc: '汇总各评委评分，计算最终得分' }, { step: 6, name: '确定中标人', desc: '按得分高低确定中标候选人' }, { step: 7, name: '公示', desc: '公示中标结果' }] }
             };
-            const handleUpload = async (e) => {
-                const file = e.target.files[0]; if (!file) return;
-                setParsing(true); await new Promise(r => setTimeout(r, 2000));
-                const ci = categoryData[activeCategory];
-                const data = { id: generateId(), category: activeCategory, name: file.name.replace(/\.[^/.]+$/, ''), client: ci.client, budget: ci.budget, deadline: '2024-06-30', qualification: ci.qualification, capitalRequirement: ci.capitalRequirement, requirements: ci.requirements, parsedData, createdAt: new Date().toISOString() };
-                setTenderData(data); saveData('bid_ai_tender_data', data); setParsing(false);
-            };
-            const renderTabContent = () => {
-                const data = tenderData?.parsedData?.[activeTab];
-                if (!data) return <div className="text-center py-8 text-gray-400">请先上传招标文件</div>;
-                switch (activeTab) {
-                    case 'basic': return (<div className="grid grid-cols-2 gap-4">{data.content.map((item, i) => (<div key={i} className="p-3 bg-gray-50 rounded-lg"><div className="text-sm text-gray-500">{item.label}</div><div className="font-medium">{item.value}</div></div>))}</div>);
-                    case 'qualification': case 'requirements': case 'documents': case 'review': return (<ul className="space-y-2">{data.content.map((item, i) => (<li key={i} className="flex items-start p-3 bg-gray-50 rounded-lg"><i className="fas fa-check-circle text-green-500 mt-1 mr-3"></i><span>{typeof item === 'string' ? item : item.name || item}</span></li>))}</ul>);
-                    case 'evaluation': case 'scoring': return (<div className="space-y-3">{data.content.map((item, i) => (<div key={i} className="p-4 bg-gray-50 rounded-lg"><div className="flex justify-between items-center mb-2"><span className="font-medium">{item.name || item.item}</span><span className="px-2 py-1 bg-blue-100 text-blue-700 rounded text-sm">{item.weight || item.score + '分'}</span></div><div className="text-sm text-gray-500">{item.desc}</div></div>))}</div>);
-                    case 'disqualification': return (<div className="space-y-4">{data.content.map((group, i) => (<div key={i} className="p-4 bg-gray-50 rounded-lg"><div className={`font-medium mb-2 ${group.type === '严重' ? 'text-red-600' : group.type === '重要' ? 'text-orange-600' : 'text-yellow-600'}`}><i className="fas fa-exclamation-triangle mr-2"></i>{group.type}项</div><ul className="space-y-1 text-sm">{group.items.map((item, j) => (<li key={j} className="flex items-center"><i className="fas fa-times-circle text-red-400 mr-2"></i>{item}</li>))}</ul></div>))}</div>);
-                    case 'process': return (<div className="space-y-3">{data.content.map((item, i) => (<div key={i} className="flex items-start p-4 bg-gray-50 rounded-lg"><div className="w-8 h-8 bg-blue-500 text-white rounded-full flex items-center justify-center mr-4 flex-shrink-0">{item.step}</div><div><div className="font-medium">{item.name}</div><div className="text-sm text-gray-500">{item.desc}</div></div></div>))}</div>);
-                    default: return null;
-                }
-            };
+            const handleUpload = async (e) => { const file = e.target.files[0]; if (!file) return; setParsing(true); await new Promise(r => setTimeout(r, 2000)); const ci = categoryData[activeCategory]; const data = { id: generateId(), category: activeCategory, name: file.name.replace(/\.[^/.]+$/, ''), client: ci.client, budget: ci.budget, deadline: '2024-06-30', qualification: ci.qualification, capitalRequirement: ci.capitalRequirement, requirements: ci.requirements, parsedData, createdAt: new Date().toISOString() }; setTenderData(data); saveData('bid_ai_tender_data', data); setParsing(false); };
+            const renderTabContent = () => { const data = tenderData?.parsedData?.[activeTab]; if (!data) return <div className="text-center py-8 text-gray-400">请先上传招标文件</div>; switch (activeTab) { case 'basic': return (<div className="grid grid-cols-2 gap-4">{data.content.map((item, i) => (<div key={i} className="p-3 bg-gray-50 rounded-lg"><div className="text-sm text-gray-500">{item.label}</div><div className="font-medium">{item.value}</div></div>))}</div>); case 'qualification': case 'requirements': case 'documents': case 'review': return (<ul className="space-y-2">{data.content.map((item, i) => (<li key={i} className="flex items-start p-3 bg-gray-50 rounded-lg"><i className="fas fa-check-circle text-green-500 mt-1 mr-3"></i><span>{typeof item === 'string' ? item : item.name || item}</span></li>))}</ul>); case 'evaluation': case 'scoring': return (<div className="space-y-3">{data.content.map((item, i) => (<div key={i} className="p-4 bg-gray-50 rounded-lg"><div className="flex justify-between items-center mb-2"><span className="font-medium">{item.name || item.item}</span><span className="px-2 py-1 bg-blue-100 text-blue-700 rounded text-sm">{item.weight || item.score + '分'}</span></div><div className="text-sm text-gray-500">{item.desc}</div></div>))}</div>); case 'disqualification': return (<div className="space-y-4">{data.content.map((group, i) => (<div key={i} className="p-4 bg-gray-50 rounded-lg"><div className={`font-medium mb-2 ${group.type === '严重' ? 'text-red-600' : group.type === '重要' ? 'text-orange-600' : 'text-yellow-600'}`}><i className="fas fa-exclamation-triangle mr-2"></i>{group.type}项</div><ul className="space-y-1 text-sm">{group.items.map((item, j) => (<li key={j} className="flex items-center"><i className="fas fa-times-circle text-red-400 mr-2"></i>{item}</li>))}</ul></div>))}</div>); case 'process': return (<div className="space-y-3">{data.content.map((item, i) => (<div key={i} className="flex items-start p-4 bg-gray-50 rounded-lg"><div className="w-8 h-8 bg-blue-500 text-white rounded-full flex items-center justify-center mr-4 flex-shrink-0">{item.step}</div><div><div className="font-medium">{item.name}</div><div className="text-sm text-gray-500">{item.desc}</div></div></div>))}</div>); default: return null; } };
             return (
                 <div className="p-6 fade-in">
                     <h2 className="text-2xl font-bold text-gray-800 mb-6"><i className="fas fa-file-alt mr-3 text-green-600"></i>招标文件解读</h2>
-                    <div className="bg-white rounded-xl shadow p-6 mb-6">
-                        <h3 className="font-semibold mb-4">选择招标类型</h3>
-                        <div className="grid grid-cols-3 gap-4">
-                            {categories.map(cat => (
-                                <div key={cat.id} onClick={() => setActiveCategory(cat.id)} className={`p-4 rounded-xl border-2 cursor-pointer transition ${activeCategory === cat.id ? 'border-blue-500 bg-blue-50' : 'border-gray-200 hover:border-gray-300'}`}>
-                                    <div className="flex items-center mb-2"><i className={`fas ${cat.icon} text-2xl text-blue-500 mr-3`}></i><span className={`font-bold text-lg ${activeCategory === cat.id ? 'text-blue-700' : 'text-gray-700'}`}>{cat.label}</span></div>
-                                    <p className="text-sm text-gray-500">{cat.desc}</p>
-                                    {activeCategory === cat.id && <div className="mt-2 text-xs text-green-600"><i className="fas fa-check-circle mr-1"></i>已选择</div>}
-                                </div>
-                            ))}
-                        </div>
-                    </div>
-                    <div className="bg-white rounded-xl shadow p-6 mb-6">
-                        <div className="border-2 border-dashed border-gray-300 rounded-xl p-8 text-center hover:border-green-500 transition cursor-pointer">
-                            <input type="file" accept=".pdf,.doc,.docx" onChange={handleUpload} className="hidden" id="file-upload" />
-                            <label htmlFor="file-upload" className="cursor-pointer">
-                                {parsing ? (<div><i className="fas fa-spinner fa-spin text-4xl text-green-500 mb-4"></i><p className="text-gray-600">AI正在解读招标文件...</p></div>) : (<div><i className="fas fa-cloud-upload-alt text-4xl text-gray-400 mb-4"></i><p className="text-gray-600">点击或拖拽上传招标文件</p><p className="text-sm text-gray-400 mt-2">支持 PDF、Word 格式</p></div>)}
-                            </label>
-                        </div>
-                    </div>
+                    <div className="bg-white rounded-xl shadow p-6 mb-6"><h3 className="font-semibold mb-4">选择招标类型</h3><div className="grid grid-cols-3 gap-4">{categories.map(cat => (<div key={cat.id} onClick={() => setActiveCategory(cat.id)} className={`p-4 rounded-xl border-2 cursor-pointer transition ${activeCategory === cat.id ? 'border-blue-500 bg-blue-50' : 'border-gray-200 hover:border-gray-300'}`}><div className="flex items-center mb-2"><i className={`fas ${cat.icon} text-2xl text-blue-500 mr-3`}></i><span className={`font-bold text-lg ${activeCategory === cat.id ? 'text-blue-700' : 'text-gray-700'}`}>{cat.label}</span></div><p className="text-sm text-gray-500">{cat.desc}</p>{activeCategory === cat.id && <div className="mt-2 text-xs text-green-600"><i className="fas fa-check-circle mr-1"></i>已选择</div>}</div>))}</div></div>
+                    <div className="bg-white rounded-xl shadow p-6 mb-6"><div className="border-2 border-dashed border-gray-300 rounded-xl p-8 text-center hover:border-green-500 transition cursor-pointer"><input type="file" accept=".pdf,.doc,.docx" onChange={handleUpload} className="hidden" id="file-upload" /><label htmlFor="file-upload" className="cursor-pointer">{parsing ? (<div><i className="fas fa-spinner fa-spin text-4xl text-green-500 mb-4"></i><p className="text-gray-600">AI正在解读招标文件...</p></div>) : (<div><i className="fas fa-cloud-upload-alt text-4xl text-gray-400 mb-4"></i><p className="text-gray-600">点击或拖拽上传招标文件</p><p className="text-sm text-gray-400 mt-2">支持 PDF、Word 格式</p></div>)}</label></div></div>
                     {tenderData && (
                         <div className="bg-white rounded-xl shadow">
-                            <div className="p-4 border-b border-gray-200">
-                                <div className="flex items-center justify-between"><h3 className="font-semibold">招标文件解读结果</h3>
-                                    <div className="flex gap-2"><button className="px-3 py-1.5 text-sm bg-blue-50 text-blue-600 rounded-lg hover:bg-blue-100"><i className="fas fa-share-alt mr-1"></i>分享</button><button className="px-3 py-1.5 text-sm bg-green-50 text-green-600 rounded-lg hover:bg-green-100"><i className="fas fa-download mr-1"></i>下载</button></div>
-                                </div>
-                                <div className="mt-2 text-sm text-gray-500"><span className="mr-4"><i className="fas fa-file mr-1"></i>{tenderData.name}</span><span className="mr-4"><i className="fas fa-tag mr-1"></i>{categories.find(c => c.id === tenderData.category)?.label}</span><span><i className="fas fa-clock mr-1"></i>{new Date(tenderData.createdAt).toLocaleString('zh-CN')}</span></div>
-                            </div>
-                            <div className="flex">
-                                <div className="w-56 border-r border-gray-200 bg-gray-50">
-                                    {tabs.map(tab => (<div key={tab.id} onClick={() => setActiveTab(tab.id)} className={`px-4 py-3 cursor-pointer transition flex items-center ${activeTab === tab.id ? 'bg-white text-blue-600 border-l-4 border-blue-600' : 'text-gray-600 hover:bg-gray-100'}`}><i className={`fas ${tab.icon} w-5`}></i><span className="text-sm">{tab.label}</span></div>))}
-                                </div>
-                                <div className="flex-1 p-6"><h4 className="text-lg font-semibold mb-4">{parsedData[activeTab]?.title}</h4>{renderTabContent()}</div>
-                            </div>
+                            <div className="p-4 border-b border-gray-200"><div className="flex items-center justify-between"><h3 className="font-semibold">招标文件解读结果</h3><div className="flex gap-2"><button className="px-3 py-1.5 text-sm bg-blue-50 text-blue-600 rounded-lg hover:bg-blue-100"><i className="fas fa-share-alt mr-1"></i>分享</button><button className="px-3 py-1.5 text-sm bg-green-50 text-green-600 rounded-lg hover:bg-green-100"><i className="fas fa-download mr-1"></i>下载</button></div></div><div className="mt-2 text-sm text-gray-500"><span className="mr-4"><i className="fas fa-file mr-1"></i>{tenderData.name}</span><span className="mr-4"><i className="fas fa-tag mr-1"></i>{categories.find(c => c.id === tenderData.category)?.label}</span><span><i className="fas fa-clock mr-1"></i>{new Date(tenderData.createdAt).toLocaleString('zh-CN')}</span></div></div>
+                            <div className="flex"><div className="w-56 border-r border-gray-200 bg-gray-50">{tabs.map(tab => (<div key={tab.id} onClick={() => setActiveTab(tab.id)} className={`px-4 py-3 cursor-pointer transition flex items-center ${activeTab === tab.id ? 'bg-white text-blue-600 border-l-4 border-blue-600' : 'text-gray-600 hover:bg-gray-100'}`}><i className={`fas ${tab.icon} w-5`}></i><span className="text-sm">{tab.label}</span></div>))}</div><div className="flex-1 p-6"><h4 className="text-lg font-semibold mb-4">{parsedData[activeTab]?.title}</h4>{renderTabContent()}</div></div>
                             <div className="p-4 border-t border-gray-200 bg-yellow-50"><div className="flex items-center text-sm text-yellow-700"><i className="fas fa-info-circle mr-2"></i><span>AI生成内容仅供参考，请仔细甄别并与原始招标文件核对</span></div></div>
                         </div>
                     )}
@@ -349,41 +382,21 @@
             );
         };
 
-        // ========== 模块03: 标书写作 ==========
+        // ========== WRITING MODULE ==========
         const WritingModule = () => {
-            const { companies, tenderData, bids, setBids } = useApp();
+            const { tenderData, bids, setBids } = useApp();
             const [writingMode, setWritingMode] = useState('score');
             const [bidType, setBidType] = useState('business');
             const [generating, setGenerating] = useState(false);
             const [generatedBid, setGeneratedBid] = useState(null);
             const [activeStep, setActiveStep] = useState(0);
-            const writingModes = [
-                { id: 'score', label: '按评分点写', icon: 'fa-star', desc: '精准响应评分点，轻松完成标书', color: 'purple' },
-                { id: 'outline', label: '按目录写', icon: 'fa-list-alt', desc: '上传章节目录，AI帮你写正文', color: 'blue' },
-                { id: 'section', label: '编写专项章节', icon: 'fa-file-alt', desc: '精细编写章节，提升内容质量', color: 'green' }
-            ];
+            const writingModes = [{ id: 'score', label: '按评分点写', icon: 'fa-star', desc: '精准响应评分点，轻松完成标书' }, { id: 'outline', label: '按目录写', icon: 'fa-list-alt', desc: '上传章节目录，AI帮你写正文' }, { id: 'section', label: '编写专项章节', icon: 'fa-file-alt', desc: '精细编写章节，提升内容质量' }];
             const scorePoints = [{ id: 'price', name: '价格分', weight: 40, desc: '报价合理性' }, { id: 'technical', name: '技术方案', weight: 25, desc: '方案完整性、可行性' }, { id: 'team', name: '项目团队', weight: 15, desc: '人员配置、资质' }, { id: 'experience', name: '企业业绩', weight: 10, desc: '类似项目经验' }, { id: 'service', name: '售后服务', weight: 10, desc: '服务承诺、响应' }];
-            const handleGenerate = async () => {
-                if (!tenderData) { alert('请先上传招标文件'); return; }
-                setGenerating(true); setActiveStep(1); await new Promise(r => setTimeout(r, 1000)); setActiveStep(2); await new Promise(r => setTimeout(r, 2000)); setActiveStep(3); await new Promise(r => setTimeout(r, 1000));
-                const bid = { id: generateId(), tenderId: tenderData.id, tenderName: tenderData.name, type: bidType, mode: writingMode, content: `基于${writingModes.find(m => m.id === writingMode).label}模式生成的标书内容`, price: bidType === 'business' ? 850 : null, sections: [{ id: 1, name: '投标函' }, { id: 2, name: '技术方案' }, { id: 3, name: '报价清单' }], scorePoints: scorePoints.map(s => ({ ...s, responded: true })), team: [{ role: '项目经理', name: '张工' }], createdAt: new Date().toISOString() };
-                const updated = [...bids, bid]; setBids(updated); saveData('bid_ai_bid_history', updated); setGeneratedBid(bid); setGenerating(false);
-            };
+            const handleGenerate = async () => { if (!tenderData) { alert('请先上传招标文件'); return; } setGenerating(true); setActiveStep(1); await new Promise(r => setTimeout(r, 1000)); setActiveStep(2); await new Promise(r => setTimeout(r, 2000)); setActiveStep(3); await new Promise(r => setTimeout(r, 1000)); const bid = { id: generateId(), tenderId: tenderData.id, tenderName: tenderData.name, type: bidType, mode: writingMode, content: `基于${writingModes.find(m => m.id === writingMode).label}模式生成的标书内容`, price: bidType === 'business' ? 850 : null, sections: [{ id: 1, name: '投标函' }, { id: 2, name: '技术方案' }, { id: 3, name: '报价清单' }], scorePoints: scorePoints.map(s => ({ ...s, responded: true })), team: [{ role: '项目经理', name: '张工' }], createdAt: new Date().toISOString() }; const updated = [...bids, bid]; setBids(updated); saveData('bid_ai_bid_history', updated); setGeneratedBid(bid); setGenerating(false); };
             return (
                 <div className="p-6 fade-in">
                     <h2 className="text-2xl font-bold text-gray-800 mb-6"><i className="fas fa-pen-fancy mr-3 text-purple-600"></i>标书写作</h2>
-                    <div className="bg-white rounded-xl shadow p-6 mb-6">
-                        <h3 className="font-semibold mb-4">选择写作模式</h3>
-                        <div className="grid grid-cols-3 gap-4">
-                            {writingModes.map(mode => (
-                                <div key={mode.id} onClick={() => setWritingMode(mode.id)} className={`p-6 rounded-xl border-2 cursor-pointer transition ${writingMode === mode.id ? 'border-purple-500 bg-purple-50' : 'border-gray-200 hover:border-gray-300'}`}>
-                                    <div className="w-12 h-12 rounded-lg bg-purple-100 flex items-center justify-center mb-4"><i className={`fas ${mode.icon} text-xl text-purple-600`}></i></div>
-                                    <h4 className="font-bold mb-2">{mode.label}</h4><p className="text-sm text-gray-500">{mode.desc}</p>
-                                    {writingMode === mode.id && <div className="mt-3 text-xs text-purple-600 font-medium"><i className="fas fa-check-circle mr-1"></i>已选择</div>}
-                                </div>
-                            ))}
-                        </div>
-                    </div>
+                    <div className="bg-white rounded-xl shadow p-6 mb-6"><h3 className="font-semibold mb-4">选择写作模式</h3><div className="grid grid-cols-3 gap-4">{writingModes.map(mode => (<div key={mode.id} onClick={() => setWritingMode(mode.id)} className={`p-6 rounded-xl border-2 cursor-pointer transition ${writingMode === mode.id ? 'border-purple-500 bg-purple-50' : 'border-gray-200 hover:border-gray-300'}`}><div className="w-12 h-12 rounded-lg bg-purple-100 flex items-center justify-center mb-4"><i className={`fas ${mode.icon} text-xl text-purple-600`}></i></div><h4 className="font-bold mb-2">{mode.label}</h4><p className="text-sm text-gray-500">{mode.desc}</p>{writingMode === mode.id && <div className="mt-3 text-xs text-purple-600 font-medium"><i className="fas fa-check-circle mr-1"></i>已选择</div>}</div>))}</div></div>
                     {generating && (<div className="bg-white rounded-xl shadow p-6 mb-6"><h3 className="font-semibold mb-4">生成进度</h3><div className="flex items-center">{['分析招标文件', '匹配评分点', '生成内容'].map((step, i) => (<React.Fragment key={i}><div className={`flex items-center ${activeStep >= i ? 'text-purple-600' : 'text-gray-400'}`}><div className={`w-10 h-10 rounded-full flex items-center justify-center ${activeStep > i ? 'bg-purple-600 text-white' : activeStep === i ? 'bg-purple-100 border-2 border-purple-600' : 'bg-gray-200'}`}>{activeStep > i ? <i className="fas fa-check"></i> : <span>{i + 1}</span>}</div><span className="ml-3 font-medium">{step}</span></div>{i < 2 && <div className={`flex-1 h-1 mx-4 ${activeStep > i ? 'bg-purple-600' : 'bg-gray-200'}`}></div>}</React.Fragment>))}</div><div className="mt-4 bg-gray-200 rounded-full h-2"><div className="bg-purple-600 h-2 rounded-full transition-all duration-500" style={{ width: `${(activeStep + 1) * 33}%` }}></div></div></div>)}
                     <div className="grid grid-cols-3 gap-6">
                         <div className="col-span-2 space-y-6">
@@ -400,40 +413,180 @@
             );
         };
 
-        // ========== 模块04: 标书检查 ==========
+        // ========== CHECK / PLAGIARISM MODULE ==========
         const CheckModule = () => {
             const { bids } = useApp();
             const [step, setStep] = useState(0);
             const [checking, setChecking] = useState(false);
             const [results, setResults] = useState(null);
             const [activeCategory, setActiveCategory] = useState('qualification');
-            const CHECK_RULES = {
-                qualification: { name: '资格性审查', icon: 'fa-user-check', color: 'blue', rules: ['Q001-营业执照', 'Q002-注册资本', 'Q003-资质等级', 'Q004-税务登记', 'Q005-社保缴纳', 'Q006-商业信誉'] },
-                compliance: { name: '符合性审查', icon: 'fa-clipboard-check', color: 'green', rules: ['C001-签字盖章', 'C002-密封要求', 'C003-正副本', 'C004-有效期', 'C005-格式规范'] },
-                scoring: { name: '评分项检查', icon: 'fa-star', color: 'purple', rules: ['S001-技术方案', 'S002-项目经验', 'S003-报价合理', 'S004-团队配置'] },
-                disqualification: { name: '废标项排查', icon: 'fa-exclamation-triangle', color: 'red', rules: ['D001-串通投标', 'D002-虚假材料', 'D003-恶意低价', 'D004-行贿记录'] },
-                format: { name: '格式检查', icon: 'fa-file-alt', color: 'gray', rules: ['F001-页码', 'F002-目录', 'F003-签字位置'] }
-            };
-            const runCheck = async () => {
-                setChecking(true); setStep(1); await new Promise(r => setTimeout(r, 2000));
-                const mockResults = {};
-                Object.keys(CHECK_RULES).forEach(cat => { mockResults[cat] = CHECK_RULES[cat].rules.map(rule => { const rand = Math.random(); return { id: rule.split('-')[0], name: rule.split('-')[1], status: rand < 0.6 ? 'passed' : rand < 0.8 ? 'warning' : 'critical', suggestions: rand < 0.6 ? [] : ['建议完善此项'] }; }); });
-                setResults(mockResults); setChecking(false); setStep(2);
-            };
+            const [uploadFile, setUploadFile] = useState(null);
+            const CHECK_RULES = { qualification: { name: '资格性审查', icon: 'fa-user-check', rules: ['Q001-营业执照', 'Q002-注册资本', 'Q003-资质等级', 'Q004-税务登记', 'Q005-社保缴纳', 'Q006-商业信誉'] }, compliance: { name: '符合性审查', icon: 'fa-clipboard-check', rules: ['C001-签字盖章', 'C002-密封要求', 'C003-正副本', 'C004-有效期', 'C005-格式规范'] }, scoring: { name: '评分项检查', icon: 'fa-star', rules: ['S001-技术方案', 'S002-项目经验', 'S003-报价合理', 'S004-团队配置'] }, disqualification: { name: '废标项排查', icon: 'fa-exclamation-triangle', rules: ['D001-串通投标', 'D002-虚假材料', 'D003-恶意低价', 'D004-行贿记录'] }, format: { name: '格式检查', icon: 'fa-file-alt', rules: ['F001-页码', 'F002-目录', 'F003-签字位置'] } };
+            const runCheck = async () => { setChecking(true); setStep(1); await new Promise(r => setTimeout(r, 2000)); const mockResults = {}; Object.keys(CHECK_RULES).forEach(cat => { mockResults[cat] = CHECK_RULES[cat].rules.map(rule => { const rand = Math.random(); return { id: rule.split('-')[0], name: rule.split('-')[1], status: rand < 0.6 ? 'passed' : rand < 0.8 ? 'warning' : 'critical', suggestions: rand < 0.6 ? [] : ['建议完善此项'] }; }); }); setResults(mockResults); setChecking(false); setStep(2); };
             const getStats = () => { if (!results) return { passed: 0, warning: 0, critical: 0 }; const s = { passed: 0, warning: 0, critical: 0 }; Object.values(results).forEach(cats => cats.forEach(r => s[r.status]++)); return s; };
             const stats = getStats();
             return (
                 <div className="p-6 fade-in">
-                    <h2 className="text-2xl font-bold text-gray-800 mb-6"><i className="fas fa-clipboard-check mr-3 text-orange-600"></i>标书检查</h2>
-                    <div className="flex items-center justify-center mb-8">{['选择标书', '执行检查', '查看结果'].map((s, i) => (<React.Fragment key={i}><div className={`w-10 h-10 rounded-full flex items-center justify-center font-bold ${i < step ? 'bg-green-500 text-white' : i === step ? 'bg-orange-600 text-white' : 'bg-gray-200 text-gray-500'}`}>{i < step ? <i className="fas fa-check"></i> : i + 1}</div><span className={`ml-2 text-sm ${i <= step ? 'text-gray-800' : 'text-gray-400'}`}>{s}</span>{i < 2 && <div className={`w-16 h-1 mx-3 ${i < step ? 'bg-green-500' : 'bg-gray-200'}`}></div>}</React.Fragment>))}</div>
-                    {step === 0 && (<div className="max-w-2xl mx-auto"><div className="bg-white rounded-xl shadow p-8"><h3 className="text-lg font-bold text-center mb-6">选择要检查的标书</h3>{bids.length === 0 ? (<div className="text-center py-8 text-gray-500"><i className="fas fa-file-alt text-4xl mb-3 text-gray-300"></i><p>暂无已生成的标书，将使用示例数据演示</p></div>) : (<div className="space-y-2 mb-6">{bids.map(b => (<div key={b.id} className="p-3 border rounded-lg hover:bg-gray-50 cursor-pointer"><div className="font-medium">{b.tenderName}</div></div>))}</div>)}<button onClick={runCheck} className="w-full py-3 bg-orange-600 text-white rounded-lg hover:bg-orange-700"><i className="fas fa-play mr-2"></i>{bids.length > 0 ? '开始检查' : '使用示例演示'}</button></div></div>)}
-                    {step === 1 && checking && (<div className="max-w-lg mx-auto text-center"><div className="bg-white rounded-xl shadow p-12"><i className="fas fa-search text-6xl text-orange-500 mb-6 pulse"></i><h3 className="text-xl font-bold mb-2">正在执行标书检查</h3><div className="w-full bg-gray-200 rounded-full h-2 mt-6"><div className="bg-orange-600 h-2 rounded-full progress-fill"></div></div></div></div>)}
-                    {step === 2 && results && (<div><div className="grid grid-cols-3 gap-4 mb-6"><div className="bg-green-50 rounded-xl p-4 text-center"><div className="text-2xl font-bold text-green-600">{stats.passed}</div><div className="text-sm text-gray-600">通过</div></div><div className="bg-yellow-50 rounded-xl p-4 text-center"><div className="text-2xl font-bold text-yellow-600">{stats.warning}</div><div className="text-sm text-gray-600">警告</div></div><div className="bg-red-50 rounded-xl p-4 text-center"><div className="text-2xl font-bold text-red-600">{stats.critical}</div><div className="text-sm text-gray-600">严重</div></div></div><div className="grid grid-cols-12 gap-6"><div className="col-span-3 bg-white rounded-xl shadow p-4"><h3 className="font-semibold mb-3">检查分类</h3><div className="space-y-1">{Object.entries(CHECK_RULES).map(([key, cat]) => (<div key={key} onClick={() => setActiveCategory(key)} className={`p-3 rounded-lg cursor-pointer flex items-center ${activeCategory === key ? 'bg-orange-50 text-orange-600' : 'text-gray-600 hover:bg-gray-50'}`}><i className={`fas ${cat.icon} w-5`}></i><span className="ml-2 text-sm">{cat.name}</span></div>))}</div></div><div className="col-span-9 bg-white rounded-xl shadow p-6"><div className="flex justify-between items-center mb-4"><h3 className="font-bold text-lg">{CHECK_RULES[activeCategory].name}</h3><button onClick={() => { setStep(0); setResults(null); }} className="text-sm text-orange-600"><i className="fas fa-redo mr-1"></i>重新检查</button></div><div className="space-y-2">{results[activeCategory]?.map(rule => { const sc = { passed: { icon: 'fa-check-circle', color: 'green' }, warning: { icon: 'fa-exclamation-circle', color: 'yellow' }, critical: { icon: 'fa-times-circle', color: 'red' } }; const c = sc[rule.status] || sc.passed; return (<div key={rule.id} className={`border rounded-lg p-4 bg-${c.color}-50`}><div className="flex items-center"><i className={`fas ${c.icon} text-${c.color}-500 mr-3`}></i><div><div className="font-medium">{rule.id} {rule.name}</div>{rule.status !== 'passed' && <div className="text-sm text-gray-600 mt-1">{rule.suggestions[0]}</div>}</div></div></div>); })}</div></div></div></div>)}
+                    <h2 className="text-2xl font-bold text-gray-800 mb-6"><i className="fas fa-clipboard-check mr-3 text-orange-600"></i>标书查重</h2>
+                    <div className="flex items-center justify-center mb-8">{['上传文件', '执行检查', '查看报告'].map((s, i) => (<React.Fragment key={i}><div className={`w-10 h-10 rounded-full flex items-center justify-center font-bold ${i < step ? 'bg-green-500 text-white' : i === step ? 'bg-orange-600 text-white' : 'bg-gray-200 text-gray-500'}`}>{i < step ? <i className="fas fa-check"></i> : i + 1}</div><span className={`ml-2 text-sm ${i <= step ? 'text-gray-800' : 'text-gray-400'}`}>{s}</span>{i < 2 && <div className={`w-16 h-1 mx-3 ${i < step ? 'bg-green-500' : 'bg-gray-200'}`}></div>}</React.Fragment>))}</div>
+                    {step === 0 && (<div className="max-w-2xl mx-auto"><div className="bg-white rounded-xl shadow p-8"><h3 className="text-lg font-bold text-center mb-6">上传标书文件进行查重</h3><div className="border-2 border-dashed border-gray-300 rounded-xl p-8 text-center mb-6 hover:border-orange-500 transition cursor-pointer"><input type="file" accept=".pdf,.doc,.docx" onChange={e => setUploadFile(e.target.files[0])} className="hidden" id="check-upload" /><label htmlFor="check-upload" className="cursor-pointer"><i className="fas fa-cloud-upload-alt text-4xl text-gray-400 mb-3"></i><p className="text-gray-600">{uploadFile ? uploadFile.name : '点击上传标书文件'}</p><p className="text-sm text-gray-400 mt-1">支持 PDF、Word 格式</p></label></div><button onClick={runCheck} className="w-full py-3 bg-orange-600 text-white rounded-lg hover:bg-orange-700"><i className="fas fa-search mr-2"></i>开始查重检查</button></div></div>)}
+                    {step === 1 && checking && (<div className="max-w-lg mx-auto text-center"><div className="bg-white rounded-xl shadow p-12"><i className="fas fa-search text-6xl text-orange-500 mb-6 pulse"></i><h3 className="text-xl font-bold mb-2">正在执行查重检查</h3><p className="text-gray-500 mb-4">AI正在比对数据库中的标书内容...</p><div className="w-full bg-gray-200 rounded-full h-2 mt-6"><div className="bg-orange-600 h-2 rounded-full progress-fill"></div></div></div></div>)}
+                    {step === 2 && results && (<div><div className="grid grid-cols-3 gap-4 mb-6"><div className="bg-green-50 rounded-xl p-4 text-center"><div className="text-2xl font-bold text-green-600">{stats.passed}</div><div className="text-sm text-gray-600">通过</div></div><div className="bg-yellow-50 rounded-xl p-4 text-center"><div className="text-2xl font-bold text-yellow-600">{stats.warning}</div><div className="text-sm text-gray-600">警告</div></div><div className="bg-red-50 rounded-xl p-4 text-center"><div className="text-2xl font-bold text-red-600">{stats.critical}</div><div className="text-sm text-gray-600">严重</div></div></div>
+                        <div className="bg-white rounded-xl shadow p-6 mb-6"><h3 className="font-bold text-lg mb-4">查重报告摘要</h3><div className="grid grid-cols-3 gap-4"><div className="p-4 bg-blue-50 rounded-lg text-center"><div className="text-3xl font-bold text-blue-600">{Math.floor(Math.random()*15+3)}%</div><div className="text-sm text-gray-500 mt-1">整体相似度</div></div><div className="p-4 bg-green-50 rounded-lg text-center"><div className="text-3xl font-bold text-green-600">{Math.floor(Math.random()*5+1)}</div><div className="text-sm text-gray-500 mt-1">匹配文档数</div></div><div className="p-4 bg-purple-50 rounded-lg text-center"><div className="text-3xl font-bold text-purple-600">{Math.floor(Math.random()*10+5)}</div><div className="text-sm text-gray-500 mt-1">疑似段落</div></div></div></div>
+                        <div className="grid grid-cols-12 gap-6"><div className="col-span-3 bg-white rounded-xl shadow p-4"><h3 className="font-semibold mb-3">检查分类</h3><div className="space-y-1">{Object.entries(CHECK_RULES).map(([key, cat]) => (<div key={key} onClick={() => setActiveCategory(key)} className={`p-3 rounded-lg cursor-pointer flex items-center ${activeCategory === key ? 'bg-orange-50 text-orange-600' : 'text-gray-600 hover:bg-gray-50'}`}><i className={`fas ${cat.icon} w-5`}></i><span className="ml-2 text-sm">{cat.name}</span></div>))}</div></div><div className="col-span-9 bg-white rounded-xl shadow p-6"><div className="flex justify-between items-center mb-4"><h3 className="font-bold text-lg">{CHECK_RULES[activeCategory].name}</h3><button onClick={() => { setStep(0); setResults(null); }} className="text-sm text-orange-600"><i className="fas fa-redo mr-1"></i>重新检查</button></div><div className="space-y-2">{results[activeCategory]?.map(rule => { const sc = { passed: { icon: 'fa-check-circle', color: 'green' }, warning: { icon: 'fa-exclamation-circle', color: 'yellow' }, critical: { icon: 'fa-times-circle', color: 'red' } }; const c = sc[rule.status] || sc.passed; return (<div key={rule.id} className={`border rounded-lg p-4 bg-${c.color}-50`}><div className="flex items-center"><i className={`fas ${c.icon} text-${c.color}-500 mr-3`}></i><div className="flex-1"><div className="font-medium">{rule.name}</div>{rule.suggestions?.length > 0 && <div className="text-sm text-gray-500 mt-1">{rule.suggestions.join('；')}</div>}</div><span className={`px-2 py-1 text-xs rounded bg-${c.color}-100 text-${c.color}-700`}>{rule.status === 'passed' ? '通过' : rule.status === 'warning' ? '警告' : '严重'}</span></div></div>); })}</div></div></div></div>)}
                 </div>
             );
         };
 
-        // ========== 模块05: 项目管理 ==========
+        // ========== BUSINESS BID ASSISTANT ==========
+        const BusinessModule = () => {
+            const { tenderData, companies } = useApp();
+            const [generating, setGenerating] = useState(false);
+            const [generated, setGenerated] = useState(null);
+            const [activeTab, setActiveTab] = useState('quotation');
+            const tabs = [{ id: 'quotation', label: '报价表', icon: 'fa-table' }, { id: 'certificate', label: '资质文件清单', icon: 'fa-certificate' }, { id: 'guarantee', label: '投标保函', icon: 'fa-shield-alt' }, { id: 'performance', label: '履约能力', icon: 'fa-chart-line' }];
+            const quotationItems = [{ name: '智慧政务平台软件系统', spec: '定制开发', unit: '套', qty: 1, price: 320, amount: 320 }, { name: '服务器硬件设备', spec: 'Dell R750', unit: '台', qty: 4, price: 25, amount: 100 }, { name: '网络设备', spec: '华为S5735', unit: '台', qty: 8, price: 3.5, amount: 28 }, { name: '系统集成费', spec: '含安装调试', unit: '项', qty: 1, price: 30, amount: 30 }, { name: '培训费', spec: '现场培训', unit: '次', qty: 5, price: 2, amount: 10 }, { name: '三年运维服务', spec: '7x24小时', unit: '年', qty: 3, price: 4, amount: 12 }];
+            const certList = [{ name: '营业执照副本', required: true, status: 'ready' }, { name: '资质证书', required: true, status: 'ready' }, { name: '安全生产许可证', required: false, status: 'pending' }, { name: 'ISO9001质量管理体系', required: true, status: 'ready' }, { name: 'ISO14001环境管理体系', required: false, status: 'missing' }, { name: '近三年财务审计报告', required: true, status: 'ready' }, { name: '类似项目业绩证明', required: true, status: 'pending' }, { name: '项目经理资格证书', required: true, status: 'ready' }];
+            const handleGenerate = async () => { setGenerating(true); await new Promise(r => setTimeout(r, 2500)); setGenerated({ quotation: quotationItems, certificate: certList, guarantee: { type: '银行保函', amount: tenderData?.budget ? tenderData.budget * 0.02 : 10, validUntil: '2024-12-31' }, performance: { score: 92, level: '优秀', factors: ['注册资本充足', '近三年业绩良好', '技术团队完备', '无不良记录'] }, generatedAt: new Date().toISOString() }); setGenerating(false); };
+            const renderTab = () => {
+                if (!generated) return <div className="text-center py-12 text-gray-400"><i className="fas fa-file-invoice-dollar text-5xl mb-4"></i><p>点击右侧按钮生成商务标文件</p></div>;
+                switch (activeTab) {
+                    case 'quotation': const total = generated.quotation.reduce((s, i) => s + i.amount, 0); return (<div className="overflow-x-auto"><table className="w-full"><thead className="bg-gray-50"><tr><th className="px-4 py-3 text-left text-sm font-semibold">序号</th><th className="px-4 py-3 text-left text-sm font-semibold">项目名称</th><th className="px-4 py-3 text-left text-sm font-semibold">规格型号</th><th className="px-4 py-3 text-center text-sm font-semibold">单位</th><th className="px-4 py-3 text-center text-sm font-semibold">数量</th><th className="px-4 py-3 text-right text-sm font-semibold">单价(万)</th><th className="px-4 py-3 text-right text-sm font-semibold">金额(万)</th></tr></thead><tbody className="divide-y">{generated.quotation.map((item, i) => (<tr key={i} className="hover:bg-gray-50"><td className="px-4 py-3 text-sm">{i + 1}</td><td className="px-4 py-3 text-sm font-medium">{item.name}</td><td className="px-4 py-3 text-sm text-gray-500">{item.spec}</td><td className="px-4 py-3 text-sm text-center">{item.unit}</td><td className="px-4 py-3 text-sm text-center">{item.qty}</td><td className="px-4 py-3 text-sm text-right">{item.price}</td><td className="px-4 py-3 text-sm text-right font-medium">{item.amount}</td></tr>))}</tbody><tfoot className="bg-blue-50"><tr><td colSpan={6} className="px-4 py-3 text-right font-bold">合计</td><td className="px-4 py-3 text-right font-bold text-blue-600">{total} 万元</td></tr></tfoot></table></div>);
+                    case 'certificate': return (<div className="space-y-3">{generated.certificate.map((cert, i) => (<div key={i} className="flex items-center justify-between p-4 bg-gray-50 rounded-lg"><div className="flex items-center"><i className={`fas ${cert.status === 'ready' ? 'fa-check-circle text-green-500' : cert.status === 'pending' ? 'fa-clock text-yellow-500' : 'fa-times-circle text-red-500'} mr-3`}></i><span className="font-medium">{cert.name}</span>{cert.required && <span className="ml-2 px-1.5 py-0.5 text-xs bg-red-100 text-red-600 rounded">必交</span>}</div><span className={`text-sm ${cert.status === 'ready' ? 'text-green-600' : cert.status === 'pending' ? 'text-yellow-600' : 'text-red-600'}`}>{cert.status === 'ready' ? '已准备' : cert.status === 'pending' ? '待准备' : '缺失'}</span></div>))}</div>);
+                    case 'guarantee': return (<div className="grid grid-cols-2 gap-6"><div className="p-6 bg-blue-50 rounded-xl"><div className="text-sm text-gray-500 mb-1">保函类型</div><div className="text-xl font-bold text-blue-600">{generated.guarantee.type}</div></div><div className="p-6 bg-green-50 rounded-xl"><div className="text-sm text-gray-500 mb-1">保函金额</div><div className="text-xl font-bold text-green-600">{generated.guarantee.amount} 万元</div></div><div className="p-6 bg-purple-50 rounded-xl"><div className="text-sm text-gray-500 mb-1">有效期至</div><div className="text-xl font-bold text-purple-600">{generated.guarantee.validUntil}</div></div><div className="p-6 bg-orange-50 rounded-xl"><div className="text-sm text-gray-500 mb-1">开具银行</div><div className="text-xl font-bold text-orange-600">中国工商银行</div></div></div>);
+                    case 'performance': return (<div><div className="flex items-center justify-center mb-6"><div className="w-32 h-32 rounded-full border-8 border-green-500 flex items-center justify-center"><div className="text-center"><div className="text-3xl font-bold text-green-600">{generated.performance.score}</div><div className="text-sm text-gray-500">综合评分</div></div></div></div><div className="grid grid-cols-2 gap-4">{generated.performance.factors.map((f, i) => (<div key={i} className="flex items-center p-3 bg-gray-50 rounded-lg"><i className="fas fa-check-circle text-green-500 mr-3"></i><span className="text-sm">{f}</span></div>))}</div></div>);
+                    default: return null;
+                }
+            };
+            return (
+                <div className="p-6 fade-in">
+                    <h2 className="text-2xl font-bold text-gray-800 mb-6"><i className="fas fa-file-invoice-dollar mr-3 text-teal-600"></i>商务标助手</h2>
+                    <div className="grid grid-cols-4 gap-6">
+                        <div className="col-span-1">
+                            <div className="bg-white rounded-xl shadow p-4 mb-4"><h4 className="font-semibold mb-3">项目信息</h4><div className="space-y-3 text-sm"><div><div className="text-gray-500">招标项目</div><div className="font-medium">{tenderData ? tenderData.name : '未选择'}</div></div><div><div className="text-gray-500">预算金额</div><div className="font-medium">{tenderData ? tenderData.budget + '万' : '-'}</div></div><div><div className="text-gray-500">企业数量</div><div className="font-medium">{companies.length} 家</div></div></div></div>
+                            <button onClick={handleGenerate} disabled={generating} className={`w-full py-3 rounded-xl font-bold transition ${generating ? 'bg-gray-300 cursor-not-allowed' : 'bg-teal-600 text-white hover:bg-teal-700 shadow-lg'}`}>{generating ? <><i className="fas fa-spinner fa-spin mr-2"></i>生成中...</> : <><i className="fas fa-magic mr-2"></i>AI生成商务标</>}</button>
+                        </div>
+                        <div className="col-span-3">
+                            <div className="bg-white rounded-xl shadow"><div className="flex border-b">{tabs.map(tab => (<button key={tab.id} onClick={() => setActiveTab(tab.id)} className={`flex items-center px-6 py-4 text-sm font-medium border-b-2 transition ${activeTab === tab.id ? 'border-teal-500 text-teal-600' : 'border-transparent text-gray-500 hover:text-gray-700'}`}><i className={`fas ${tab.icon} mr-2`}></i>{tab.label}</button>))}</div><div className="p-6">{renderTab()}</div></div>
+                        </div>
+                    </div>
+                </div>
+            );
+        };
+
+        // ========== OPPORTUNITIES MODULE ==========
+        const OpportunitiesModule = () => {
+            const [searchText, setSearchText] = useState('');
+            const [filterRegion, setFilterRegion] = useState('all');
+            const [filterType, setFilterType] = useState('all');
+            const [filterStatus, setFilterStatus] = useState('all');
+            const mockOpportunities = [
+                { id: 1, title: '某市智慧城市建设项目招标公告', region: '北京', type: '工程类', budget: '2000万', deadline: '2024-07-15', status: '招标中', source: '政府采购网' },
+                { id: 2, title: '某省医疗信息化平台采购项目', region: '上海', type: '货物类', budget: '800万', deadline: '2024-07-20', status: '招标中', source: '中国招标网' },
+                { id: 3, title: '某市交通信号系统集成项目', region: '广东', type: '服务类', budget: '500万', deadline: '2024-07-10', status: '即将截止', source: '公共资源交易中心' },
+                { id: 4, title: '某区数据中心机房建设项目', region: '浙江', type: '工程类', budget: '1500万', deadline: '2024-08-01', status: '招标中', source: '政府采购网' },
+                { id: 5, title: '某市环保监测设备采购', region: '江苏', type: '货物类', budget: '350万', deadline: '2024-07-25', status: '招标中', source: '中国招标网' },
+                { id: 6, title: '某省教育云平台运维服务', region: '四川', type: '服务类', budget: '200万', deadline: '2024-07-05', status: '即将截止', source: '公共资源交易中心' },
+                { id: 7, title: '某市智慧停车管理系统', region: '北京', type: '工程类', budget: '600万', deadline: '2024-08-10', status: '预告', source: '政府采购网' },
+                { id: 8, title: '某区安防监控设备升级改造', region: '山东', type: '货物类', budget: '450万', deadline: '2024-07-30', status: '招标中', source: '中国招标网' },
+                { id: 9, title: '某市政务大数据平台建设', region: '广东', type: '服务类', budget: '1200万', deadline: '2024-08-15', status: '预告', source: '公共资源交易中心' },
+                { id: 10, title: '某省水利信息化系统建设', region: '湖北', type: '工程类', budget: '900万', deadline: '2024-07-18', status: '招标中', source: '政府采购网' }
+            ];
+            const filtered = mockOpportunities.filter(op => { const matchSearch = !searchText || op.title.includes(searchText) || op.region.includes(searchText); const matchRegion = filterRegion === 'all' || op.region === filterRegion; const matchType = filterType === 'all' || op.type === filterType; const matchStatus = filterStatus === 'all' || op.status === filterStatus; return matchSearch && matchRegion && matchType && matchStatus; });
+            const regions = [...new Set(mockOpportunities.map(o => o.region))];
+            const types = [...new Set(mockOpportunities.map(o => o.type))];
+            const statuses = [...new Set(mockOpportunities.map(o => o.status))];
+            const statusColor = (s) => s === '即将截止' ? 'bg-red-100 text-red-700' : s === '预告' ? 'bg-blue-100 text-blue-700' : 'bg-green-100 text-green-700';
+            return (
+                <div className="p-6 fade-in">
+                    <div className="flex items-center justify-between mb-6"><h2 className="text-2xl font-bold text-gray-800"><i className="fas fa-bullhorn mr-3 text-orange-600"></i>标讯商机</h2><div className="flex items-center gap-2 text-sm text-gray-500"><i className="fas fa-sync-alt"></i><span>数据已更新</span></div></div>
+                    <div className="bg-white rounded-xl shadow p-4 mb-6"><div className="flex gap-4 items-center"><div className="relative flex-1"><i className="fas fa-search absolute left-3 top-1/2 -translate-y-1/2 text-gray-400"></i><input type="text" value={searchText} onChange={e => setSearchText(e.target.value)} placeholder="搜索招标项目名称或地区..." className="w-full pl-10 pr-4 py-2.5 border border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none text-sm" /></div><select value={filterRegion} onChange={e => setFilterRegion(e.target.value)} className="px-3 py-2.5 border border-gray-200 rounded-lg text-sm"><option value="all">全部地区</option>{regions.map(r => <option key={r} value={r}>{r}</option>)}</select><select value={filterType} onChange={e => setFilterType(e.target.value)} className="px-3 py-2.5 border border-gray-200 rounded-lg text-sm"><option value="all">全部类型</option>{types.map(t => <option key={t} value={t}>{t}</option>)}</select><select value={filterStatus} onChange={e => setFilterStatus(e.target.value)} className="px-3 py-2.5 border border-gray-200 rounded-lg text-sm"><option value="all">全部状态</option>{statuses.map(s => <option key={s} value={s}>{s}</option>)}</select></div></div>
+                    <div className="space-y-3">{filtered.map(op => (<div key={op.id} className="bg-white rounded-xl shadow p-5 hover:shadow-md transition cursor-pointer"><div className="flex items-start justify-between"><div className="flex-1"><h3 className="font-bold text-gray-800 mb-2 hover:text-blue-600">{op.title}</h3><div className="flex items-center gap-4 text-sm text-gray-500"><span><i className="fas fa-map-marker-alt mr-1"></i>{op.region}</span><span><i className="fas fa-tag mr-1"></i>{op.type}</span><span><i className="fas fa-money-bill mr-1"></i>{op.budget}</span><span><i className="fas fa-clock mr-1"></i>截止 {op.deadline}</span><span><i className="fas fa-globe mr-1"></i>{op.source}</span></div></div><div className="flex items-center gap-3 ml-4"><span className={`px-2.5 py-1 text-xs rounded-full font-medium ${statusColor(op.status)}`}>{op.status}</span><button className="px-3 py-1.5 bg-blue-50 text-blue-600 rounded-lg text-sm hover:bg-blue-100"><i className="fas fa-star mr-1"></i>关注</button></div></div></div>))}{filtered.length === 0 && <div className="text-center py-12 text-gray-400"><i className="fas fa-search text-4xl mb-3"></i><p>未找到匹配的招标信息</p></div>}</div>
+                </div>
+            );
+        };
+
+        // ========== KNOWLEDGE BASE ==========
+        const KnowledgeModule = () => {
+            const [items, setItems] = useState(loadData('bid_ai_knowledge'));
+            const [showModal, setShowModal] = useState(false);
+            const [searchText, setSearchText] = useState('');
+            const [activeCategory, setActiveCategory] = useState('all');
+            const [form, setForm] = useState({ title: '', category: 'regulation', content: '', tags: '' });
+            const categories = [{ id: 'all', label: '全部', icon: 'fa-th-large' }, { id: 'regulation', label: '法规政策', icon: 'fa-gavel' }, { id: 'standard', label: '行业标准', icon: 'fa-book' }, { id: 'template', label: '标书模板', icon: 'fa-file-alt' }, { id: 'experience', label: '经验总结', icon: 'fa-lightbulb' }];
+            const handleSave = () => { if (!form.title || !form.content) return; const item = { id: generateId(), ...form, tags: form.tags.split(',').map(t => t.trim()).filter(Boolean), createdAt: new Date().toISOString() }; const updated = [...items, item]; setItems(updated); saveData('bid_ai_knowledge', updated); setShowModal(false); setForm({ title: '', category: 'regulation', content: '', tags: '' }); };
+            const handleDelete = (id) => { if (confirm('确定删除？')) { const updated = items.filter(i => i.id !== id); setItems(updated); saveData('bid_ai_knowledge', updated); } };
+            const filtered = items.filter(item => { const matchSearch = !searchText || item.title.includes(searchText) || item.content.includes(searchText); const matchCat = activeCategory === 'all' || item.category === activeCategory; return matchSearch && matchCat; });
+            const catLabel = (id) => categories.find(c => c.id === id)?.label || id;
+            return (
+                <div className="p-6 fade-in">
+                    <div className="flex items-center justify-between mb-6"><h2 className="text-2xl font-bold text-gray-800"><i className="fas fa-book mr-3 text-blue-600"></i>知识库</h2><button onClick={() => setShowModal(true)} className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"><i className="fas fa-plus mr-2"></i>添加文档</button></div>
+                    <div className="flex gap-2 mb-6">{categories.map(cat => (<button key={cat.id} onClick={() => setActiveCategory(cat.id)} className={`px-4 py-2 rounded-lg text-sm font-medium transition ${activeCategory === cat.id ? 'bg-blue-600 text-white' : 'bg-white text-gray-600 hover:bg-gray-50 shadow-sm'}`}><i className={`fas ${cat.icon} mr-2`}></i>{cat.label}</button>))}</div>
+                    <div className="relative mb-6"><i className="fas fa-search absolute left-4 top-1/2 -translate-y-1/2 text-gray-400"></i><input type="text" value={searchText} onChange={e => setSearchText(e.target.value)} placeholder="搜索知识文档..." className="w-full pl-12 pr-4 py-3 bg-white border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none" /></div>
+                    <div className="grid grid-cols-2 gap-4">{filtered.map(item => (<div key={item.id} className="bg-white rounded-xl shadow p-5 hover:shadow-md transition"><div className="flex items-start justify-between mb-3"><div><h4 className="font-bold text-gray-800 mb-1">{item.title}</h4><span className="px-2 py-0.5 text-xs bg-blue-100 text-blue-700 rounded">{catLabel(item.category)}</span></div><button onClick={() => handleDelete(item.id)} className="text-gray-400 hover:text-red-500"><i className="fas fa-trash text-sm"></i></button></div><p className="text-sm text-gray-500 mb-3 line-clamp-2">{item.content}</p><div className="flex items-center justify-between text-xs text-gray-400"><div className="flex gap-2">{item.tags?.map((tag, i) => <span key={i} className="px-2 py-0.5 bg-gray-100 rounded">{tag}</span>)}</div><span>{new Date(item.createdAt).toLocaleDateString('zh-CN')}</span></div></div>))}{filtered.length === 0 && <div className="col-span-2 text-center py-12 text-gray-400"><i className="fas fa-book-open text-4xl mb-3"></i><p>暂无知识文档</p></div>}</div>
+                    {showModal && (<div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50"><div className="bg-white rounded-xl w-full max-w-lg p-6" onClick={e => e.stopPropagation()}><div className="flex justify-between items-center mb-6"><h3 className="text-xl font-bold">添加知识文档</h3><button onClick={() => setShowModal(false)} className="text-gray-500"><i className="fas fa-times"></i></button></div><div className="space-y-4"><input type="text" placeholder="文档标题 *" value={form.title} onChange={e => setForm({...form, title: e.target.value})} className="w-full px-3 py-2 border rounded-lg" /><select value={form.category} onChange={e => setForm({...form, category: e.target.value})} className="w-full px-3 py-2 border rounded-lg">{categories.filter(c => c.id !== 'all').map(c => <option key={c.id} value={c.id}>{c.label}</option>)}</select><textarea placeholder="文档内容 *" value={form.content} onChange={e => setForm({...form, content: e.target.value})} rows="5" className="w-full px-3 py-2 border rounded-lg"></textarea><input type="text" placeholder="标签（逗号分隔）" value={form.tags} onChange={e => setForm({...form, tags: e.target.value})} className="w-full px-3 py-2 border rounded-lg" /></div><div className="flex justify-end gap-3 mt-6"><button onClick={() => setShowModal(false)} className="px-4 py-2 text-gray-600 hover:bg-gray-100 rounded-lg">取消</button><button onClick={handleSave} className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700">保存</button></div></div>)}
+                </div>
+            );
+        };
+
+        // ========== PRODUCTS MODULE ==========
+        const ProductsModule = () => {
+            const [products, setProducts] = useState(loadData('bid_ai_products'));
+            const [showModal, setShowModal] = useState(false);
+            const [searchText, setSearchText] = useState('');
+            const [form, setForm] = useState({ name: '', brand: '', model: '', spec: '', unit: '', price: '', category: '设备' });
+            const handleSave = () => { if (!form.name) return; const product = { id: generateId(), ...form, price: parseFloat(form.price) || 0, createdAt: new Date().toISOString() }; const updated = [...products, product]; setProducts(updated); saveData('bid_ai_products', updated); setShowModal(false); setForm({ name: '', brand: '', model: '', spec: '', unit: '', price: '', category: '设备' }); };
+            const handleDelete = (id) => { if (confirm('确定删除？')) { const updated = products.filter(p => p.id !== id); setProducts(updated); saveData('bid_ai_products', updated); } };
+            const filtered = products.filter(p => !searchText || p.name.includes(searchText) || p.brand.includes(searchText));
+            return (
+                <div className="p-6 fade-in">
+                    <div className="flex items-center justify-between mb-6"><h2 className="text-2xl font-bold text-gray-800"><i className="fas fa-box mr-3 text-purple-600"></i>产品库</h2><button onClick={() => setShowModal(true)} className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"><i className="fas fa-plus mr-2"></i>添加产品</button></div>
+                    <div className="relative mb-6"><i className="fas fa-search absolute left-4 top-1/2 -translate-y-1/2 text-gray-400"></i><input type="text" value={searchText} onChange={e => setSearchText(e.target.value)} placeholder="搜索产品名称或品牌..." className="w-full pl-12 pr-4 py-3 bg-white border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none" /></div>
+                    <div className="bg-white rounded-xl shadow overflow-hidden"><table className="w-full"><thead className="bg-gray-50"><tr><th className="px-4 py-3 text-left text-sm font-semibold">产品名称</th><th className="px-4 py-3 text-left text-sm font-semibold">品牌</th><th className="px-4 py-3 text-left text-sm font-semibold">型号</th><th className="px-4 py-3 text-left text-sm font-semibold">规格</th><th className="px-4 py-3 text-center text-sm font-semibold">单位</th><th className="px-4 py-3 text-right text-sm font-semibold">参考价</th><th className="px-4 py-3 text-center text-sm font-semibold">操作</th></tr></thead><tbody className="divide-y">{filtered.map(p => (<tr key={p.id} className="hover:bg-gray-50"><td className="px-4 py-3 text-sm font-medium">{p.name}</td><td className="px-4 py-3 text-sm text-gray-500">{p.brand}</td><td className="px-4 py-3 text-sm text-gray-500">{p.model}</td><td className="px-4 py-3 text-sm text-gray-500">{p.spec}</td><td className="px-4 py-3 text-sm text-center">{p.unit}</td><td className="px-4 py-3 text-sm text-right font-medium">{p.price ? p.price + '万' : '-'}</td><td className="px-4 py-3 text-center"><button onClick={() => handleDelete(p.id)} className="text-red-500 hover:text-red-700"><i className="fas fa-trash text-sm"></i></button></td></tr>))}</tbody></table>{filtered.length === 0 && <div className="text-center py-12 text-gray-400"><i className="fas fa-box-open text-4xl mb-3"></i><p>暂无产品信息</p></div>}</div>
+                    {showModal && (<div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50"><div className="bg-white rounded-xl w-full max-w-lg p-6" onClick={e => e.stopPropagation()}><div className="flex justify-between items-center mb-6"><h3 className="text-xl font-bold">添加产品</h3><button onClick={() => setShowModal(false)} className="text-gray-500"><i className="fas fa-times"></i></button></div><div className="grid grid-cols-2 gap-4"><input type="text" placeholder="产品名称 *" value={form.name} onChange={e => setForm({...form, name: e.target.value})} className="col-span-2 px-3 py-2 border rounded-lg" /><input type="text" placeholder="品牌" value={form.brand} onChange={e => setForm({...form, brand: e.target.value})} className="px-3 py-2 border rounded-lg" /><input type="text" placeholder="型号" value={form.model} onChange={e => setForm({...form, model: e.target.value})} className="px-3 py-2 border rounded-lg" /><input type="text" placeholder="规格参数" value={form.spec} onChange={e => setForm({...form, spec: e.target.value})} className="px-3 py-2 border rounded-lg" /><input type="text" placeholder="单位" value={form.unit} onChange={e => setForm({...form, unit: e.target.value})} className="px-3 py-2 border rounded-lg" /><input type="text" placeholder="参考价（万元）" value={form.price} onChange={e => setForm({...form, price: e.target.value})} className="px-3 py-2 border rounded-lg" /><select value={form.category} onChange={e => setForm({...form, category: e.target.value})} className="px-3 py-2 border rounded-lg"><option>设备</option><option>材料</option><option>软件</option><option>服务</option></select></div><div className="flex justify-end gap-3 mt-6"><button onClick={() => setShowModal(false)} className="px-4 py-2 text-gray-600 hover:bg-gray-100 rounded-lg">取消</button><button onClick={handleSave} className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700">保存</button></div></div>)}
+                </div>
+            );
+        };
+
+        // ========== GALLERY MODULE ==========
+        const GalleryModule = () => {
+            const [images, setImages] = useState(loadData('bid_ai_gallery'));
+            const [showUpload, setShowUpload] = useState(false);
+            const [selectedImage, setSelectedImage] = useState(null);
+            const [form, setForm] = useState({ name: '', category: '施工图', description: '' });
+            const categories = ['全部', '施工图', '效果图', '组织架构', '流程图', '产品图', '其他'];
+            const [activeCat, setActiveCat] = useState('全部');
+            const handleUpload = () => { if (!form.name) return; const img = { id: generateId(), ...form, url: null, createdAt: new Date().toISOString() }; const updated = [...images, img]; setImages(updated); saveData('bid_ai_gallery', updated); setShowUpload(false); setForm({ name: '', category: '施工图', description: '' }); };
+            const handleDelete = (id) => { if (confirm('确定删除？')) { const updated = images.filter(i => i.id !== id); setImages(updated); saveData('bid_ai_gallery', updated); } };
+            const filtered = images.filter(img => activeCat === '全部' || img.category === activeCat);
+            const iconForCategory = (cat) => { const map = { '施工图': 'fa-hard-hat', '效果图': 'fa-image', '组织架构': 'fa-sitemap', '流程图': 'fa-project-diagram', '产品图': 'fa-box', '其他': 'fa-file' }; return map[cat] || 'fa-file'; };
+            return (
+                <div className="p-6 fade-in">
+                    <div className="flex items-center justify-between mb-6"><h2 className="text-2xl font-bold text-gray-800"><i className="fas fa-images mr-3 text-pink-600"></i>图库</h2><button onClick={() => setShowUpload(true)} className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"><i className="fas fa-upload mr-2"></i>上传图片</button></div>
+                    <div className="flex gap-2 mb-6">{categories.map(cat => (<button key={cat} onClick={() => setActiveCat(cat)} className={`px-4 py-2 rounded-lg text-sm font-medium transition ${activeCat === cat ? 'bg-blue-600 text-white' : 'bg-white text-gray-600 hover:bg-gray-50 shadow-sm'}`}>{cat}</button>))}</div>
+                    <div className="grid grid-cols-4 gap-4">{filtered.map(img => (<div key={img.id} className="bg-white rounded-xl shadow overflow-hidden card-hover cursor-pointer" onClick={() => setSelectedImage(img)}><div className="aspect-video bg-gray-100 flex items-center justify-center"><i className={`fas ${iconForCategory(img.category)} text-4xl text-gray-300`}></i></div><div className="p-3"><h4 className="font-medium text-sm truncate">{img.name}</h4><div className="flex items-center justify-between mt-2"><span className="text-xs text-gray-400">{img.category}</span><button onClick={e => { e.stopPropagation(); handleDelete(img.id); }} className="text-gray-400 hover:text-red-500"><i className="fas fa-trash text-xs"></i></button></div></div></div>))}{filtered.length === 0 && <div className="col-span-4 text-center py-12 text-gray-400"><i className="fas fa-images text-4xl mb-3"></i><p>暂无图片素材</p></div>}</div>
+                    {showUpload && (<div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50"><div className="bg-white rounded-xl w-full max-w-lg p-6" onClick={e => e.stopPropagation()}><div className="flex justify-between items-center mb-6"><h3 className="text-xl font-bold">上传图片</h3><button onClick={() => setShowUpload(false)} className="text-gray-500"><i className="fas fa-times"></i></button></div><div className="space-y-4"><input type="text" placeholder="图片名称 *" value={form.name} onChange={e => setForm({...form, name: e.target.value})} className="w-full px-3 py-2 border rounded-lg" /><select value={form.category} onChange={e => setForm({...form, category: e.target.value})} className="w-full px-3 py-2 border rounded-lg">{categories.filter(c => c !== '全部').map(c => <option key={c}>{c}</option>)}</select><textarea placeholder="图片描述" value={form.description} onChange={e => setForm({...form, description: e.target.value})} rows="3" className="w-full px-3 py-2 border rounded-lg"></textarea><div className="border-2 border-dashed border-gray-300 rounded-xl p-8 text-center"><i className="fas fa-cloud-upload-alt text-3xl text-gray-400 mb-2"></i><p className="text-sm text-gray-500">点击或拖拽上传图片</p></div></div><div className="flex justify-end gap-3 mt-6"><button onClick={() => setShowUpload(false)} className="px-4 py-2 text-gray-600 hover:bg-gray-100 rounded-lg">取消</button><button onClick={handleUpload} className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700">保存</button></div></div>)}
+                    {selectedImage && (<div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50" onClick={() => setSelectedImage(null)}><div className="bg-white rounded-xl w-full max-w-2xl p-6" onClick={e => e.stopPropagation()}><div className="flex justify-between items-center mb-4"><h3 className="text-xl font-bold">{selectedImage.name}</h3><button onClick={() => setSelectedImage(null)} className="text-gray-500"><i className="fas fa-times"></i></button></div><div className="aspect-video bg-gray-100 rounded-xl flex items-center justify-center mb-4"><i className={`fas ${iconForCategory(selectedImage.category)} text-6xl text-gray-300`}></i></div><div className="grid grid-cols-3 gap-4 text-sm"><div><span className="text-gray-500">分类：</span>{selectedImage.category}</div><div><span className="text-gray-500">上传时间：</span>{new Date(selectedImage.createdAt).toLocaleDateString('zh-CN')}</div><div><span className="text-gray-500">描述：</span>{selectedImage.description || '-'}</div></div></div>)}
+                </div>
+            );
+        };
+
+        // ========== MY BIDS MODULE ==========
+        const MyBidsModule = () => {
+            const { bids, setBids } = useApp();
+            const [selectedBid, setSelectedBid] = useState(null);
+            return (
+                <div className="p-6 fade-in">
+                    <h2 className="text-2xl font-bold text-gray-800 mb-6"><i className="fas fa-file-signature mr-3 text-indigo-600"></i>我的标书</h2>
+                    {bids.length === 0 ? (<div className="bg-white rounded-xl shadow p-12 text-center text-gray-400"><i className="fas fa-file-alt text-5xl mb-4"></i><p>暂无标书记录</p><p className="text-sm mt-2">前往标书写作模块生成第一份标书</p></div>) : (
+                        <div className="bg-white rounded-xl shadow overflow-hidden"><table className="w-full"><thead className="bg-gray-50"><tr><th className="px-4 py-3 text-left text-sm font-semibold">标书名称</th><th className="px-4 py-3 text-center text-sm font-semibold">类型</th><th className="px-4 py-3 text-center text-sm font-semibold">写作模式</th><th className="px-4 py-3 text-center text-sm font-semibold">生成时间</th><th className="px-4 py-3 text-center text-sm font-semibold">操作</th></tr></thead><tbody className="divide-y">{bids.map(b => (<tr key={b.id} className="hover:bg-gray-50"><td className="px-4 py-3 text-sm font-medium">{b.tenderName}</td><td className="px-4 py-3 text-sm text-center"><span className={`px-2 py-0.5 rounded text-xs ${b.type === 'business' ? 'bg-blue-100 text-blue-700' : 'bg-purple-100 text-purple-700'}`}>{b.type === 'business' ? '商务标' : '技术标'}</span></td><td className="px-4 py-3 text-sm text-center text-gray-500">{b.mode === 'score' ? '按评分点' : b.mode === 'outline' ? '按目录' : '专项章节'}</td><td className="px-4 py-3 text-sm text-center text-gray-500">{new Date(b.createdAt).toLocaleString('zh-CN')}</td><td className="px-4 py-3 text-center"><button onClick={() => setSelectedBid(b)} className="text-blue-600 hover:text-blue-700 text-sm mr-3"><i className="fas fa-eye mr-1"></i>查看</button><button onClick={() => { const updated = bids.filter(x => x.id !== b.id); setBids(updated); saveData('bid_ai_bid_history', updated); }} className="text-red-500 hover:text-red-700 text-sm"><i className="fas fa-trash mr-1"></i>删除</button></td></tr>))}</tbody></table></div>
+                    )}
+                    {selectedBid && (<div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50"><div className="bg-white rounded-xl w-full max-w-2xl p-6" onClick={e => e.stopPropagation()}><div className="flex justify-between items-center mb-6"><div><h3 className="text-xl font-bold">{selectedBid.tenderName}</h3><p className="text-gray-500 text-sm mt-1">{new Date(selectedBid.createdAt).toLocaleString('zh-CN')}</p></div><button onClick={() => setSelectedBid(null)} className="text-gray-500"><i className="fas fa-times text-xl"></i></button></div><div className="grid grid-cols-3 gap-4 mb-6"><div className="p-4 bg-blue-50 rounded-lg text-center"><div className="text-sm text-gray-500">类型</div><div className="font-bold text-blue-600 mt-1">{selectedBid.type === 'business' ? '商务标' : '技术标'}</div></div><div className="p-4 bg-purple-50 rounded-lg text-center"><div className="text-sm text-gray-500">模式</div><div className="font-bold text-purple-600 mt-1">{selectedBid.mode === 'score' ? '按评分点' : '按目录'}</div></div><div className="p-4 bg-green-50 rounded-lg text-center"><div className="text-sm text-gray-500">状态</div><div className="font-bold text-green-600 mt-1">已生成</div></div></div><div className="p-4 bg-gray-50 rounded-lg mb-4"><p className="text-sm text-gray-600">{selectedBid.content}</p></div><div className="flex gap-3"><button className="px-4 py-2 bg-blue-50 text-blue-600 rounded-lg"><i className="fas fa-eye mr-2"></i>预览</button><button className="px-4 py-2 bg-green-50 text-green-600 rounded-lg"><i className="fas fa-download mr-2"></i>下载</button></div></div>)}
+                </div>
+            );
+        };
+
+        // ========== PROJECT MODULE ==========
         const ProjectModule = () => {
             const { projects, setProjects } = useApp();
             const [showModal, setShowModal] = useState(false);
@@ -444,85 +597,43 @@
             const updateStage = (id, newStage) => { const updated = projects.map(p => p.id === id ? {...p, stage: newStage} : p); setProjects(updated); saveData('bid_ai_projects', updated); };
             return (
                 <div className="p-6 fade-in">
-                    <div className="flex justify-between items-center mb-6"><h2 className="text-2xl font-bold text-gray-800"><i className="fas fa-project-diagram mr-3 text-pink-600"></i>项目管理</h2><button onClick={() => setShowModal(true)} className="px-4 py-2 bg-pink-600 text-white rounded-lg hover:bg-pink-700"><i className="fas fa-plus mr-2"></i>新建项目</button></div>
-                    <div className="grid grid-cols-3 gap-4 mb-6">
-                        <div className="bg-white rounded-xl shadow p-4"><div className="flex items-center"><div className="w-12 h-12 rounded-full bg-blue-100 flex items-center justify-center mr-4"><i className="fas fa-folder-open text-blue-600 text-xl"></i></div><div><div className="text-2xl font-bold">{projects.length}</div><div className="text-sm text-gray-500">全部项目</div></div></div></div>
-                        <div className="bg-white rounded-xl shadow p-4"><div className="flex items-center"><div className="w-12 h-12 rounded-full bg-purple-100 flex items-center justify-center mr-4"><i className="fas fa-spinner text-purple-600 text-xl"></i></div><div><div className="text-2xl font-bold">{projects.filter(p => !['项目执行', '中标签约'].includes(p.stage)).length}</div><div className="text-sm text-gray-500">进行中</div></div></div></div>
-                        <div className="bg-white rounded-xl shadow p-4"><div className="flex items-center"><div className="w-12 h-12 rounded-full bg-green-100 flex items-center justify-center mr-4"><i className="fas fa-check-circle text-green-600 text-xl"></i></div><div><div className="text-2xl font-bold">{projects.filter(p => ['项目执行', '中标签约'].includes(p.stage)).length}</div><div className="text-sm text-gray-500">已完成</div></div></div></div>
-                    </div>
+                    <div className="flex justify-between items-center mb-6"><h2 className="text-2xl font-bold text-gray-800"><i className="fas fa-project-diagram mr-3 text-pink-600"></i>项目管理</h2><button onClick={() => setShowModal(true)} className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"><i className="fas fa-plus mr-2"></i>新建项目</button></div>
+                    <div className="grid grid-cols-3 gap-4 mb-6"><div className="bg-white rounded-xl shadow p-4"><div className="flex items-center"><div className="w-12 h-12 rounded-full bg-blue-100 flex items-center justify-center mr-4"><i className="fas fa-folder-open text-blue-600 text-xl"></i></div><div><div className="text-2xl font-bold">{projects.length}</div><div className="text-sm text-gray-500">全部项目</div></div></div></div><div className="bg-white rounded-xl shadow p-4"><div className="flex items-center"><div className="w-12 h-12 rounded-full bg-purple-100 flex items-center justify-center mr-4"><i className="fas fa-spinner text-purple-600 text-xl"></i></div><div><div className="text-2xl font-bold">{projects.filter(p => !['项目执行', '中标签约'].includes(p.stage)).length}</div><div className="text-sm text-gray-500">进行中</div></div></div></div><div className="bg-white rounded-xl shadow p-4"><div className="flex items-center"><div className="w-12 h-12 rounded-full bg-green-100 flex items-center justify-center mr-4"><i className="fas fa-check-circle text-green-600 text-xl"></i></div><div><div className="text-2xl font-bold">{projects.filter(p => ['项目执行', '中标签约'].includes(p.stage)).length}</div><div className="text-sm text-gray-500">已完成</div></div></div></div></div>
                     <div className="flex gap-4 overflow-x-auto pb-4">{STAGES.map(stage => { const sp = projects.filter(p => p.stage === stage); return (<div key={stage} className="flex-shrink-0 w-72"><div className="bg-blue-50 rounded-t-lg px-3 py-2 border-b-2 border-blue-500"><div className="flex items-center justify-between"><span className="font-medium text-blue-700">{stage}</span><span className="bg-blue-100 text-blue-700 text-xs px-2 py-0.5 rounded-full">{sp.length}</span></div></div><div className="bg-gray-100 rounded-b-lg p-2 min-h-64 space-y-2">{sp.map(p => (<div key={p.id} onClick={() => setSelectedProject(p)} className="bg-white rounded-lg p-3 cursor-pointer shadow-sm hover:shadow-md border-l-4 border-pink-500"><div className="font-medium text-sm mb-1">{p.name}</div><div className="text-xs text-gray-500">{p.client}</div></div>))}</div></div>); })}</div>
-                    {showModal && (<div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50"><div className="bg-white rounded-xl w-full max-w-lg p-6" onClick={e => e.stopPropagation()}><div className="flex justify-between items-center mb-6"><h3 className="text-xl font-bold">新建项目</h3><button onClick={() => setShowModal(false)} className="text-gray-500"><i className="fas fa-times"></i></button></div><div className="space-y-4"><input type="text" placeholder="项目名称 *" value={form.name} onChange={e => setForm({...form, name: e.target.value})} className="w-full px-3 py-2 border rounded-lg" /><input type="text" placeholder="招标单位" value={form.client} onChange={e => setForm({...form, client: e.target.value})} className="w-full px-3 py-2 border rounded-lg" /><div className="grid grid-cols-2 gap-4"><input type="text" placeholder="预算（万元）" value={form.budget} onChange={e => setForm({...form, budget: e.target.value})} className="w-full px-3 py-2 border rounded-lg" /><input type="date" value={form.deadline} onChange={e => setForm({...form, deadline: e.target.value})} className="w-full px-3 py-2 border rounded-lg" /></div></div><div className="flex justify-end gap-3 mt-6"><button onClick={() => setShowModal(false)} className="px-4 py-2 text-gray-600 hover:bg-gray-100 rounded-lg">取消</button><button onClick={handleCreate} className="px-4 py-2 bg-pink-600 text-white rounded-lg hover:bg-pink-700">创建项目</button></div></div></div>)}
-                    {selectedProject && (<div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50"><div className="bg-white rounded-xl w-full max-w-2xl p-6" onClick={e => e.stopPropagation()}><div className="flex justify-between items-center mb-6"><div><h3 className="text-xl font-bold">{selectedProject.name}</h3><p className="text-gray-500">{selectedProject.client}</p></div><div className="flex items-center gap-3"><select value={selectedProject.stage} onChange={e => { updateStage(selectedProject.id, e.target.value); setSelectedProject({...selectedProject, stage: e.target.value}); }} className="px-3 py-2 border rounded-lg">{STAGES.map(s => <option key={s} value={s}>{s}</option>)}</select><button onClick={() => setSelectedProject(null)} className="text-gray-500"><i className="fas fa-times text-xl"></i></button></div></div></div></div>)}
+                    {showModal && (<div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50"><div className="bg-white rounded-xl w-full max-w-lg p-6" onClick={e => e.stopPropagation()}><div className="flex justify-between items-center mb-6"><h3 className="text-xl font-bold">新建项目</h3><button onClick={() => setShowModal(false)} className="text-gray-500"><i className="fas fa-times"></i></button></div><div className="space-y-4"><input type="text" placeholder="项目名称 *" value={form.name} onChange={e => setForm({...form, name: e.target.value})} className="w-full px-3 py-2 border rounded-lg" /><input type="text" placeholder="招标单位" value={form.client} onChange={e => setForm({...form, client: e.target.value})} className="w-full px-3 py-2 border rounded-lg" /><div className="grid grid-cols-2 gap-4"><input type="text" placeholder="预算（万元）" value={form.budget} onChange={e => setForm({...form, budget: e.target.value})} className="w-full px-3 py-2 border rounded-lg" /><input type="date" value={form.deadline} onChange={e => setForm({...form, deadline: e.target.value})} className="w-full px-3 py-2 border rounded-lg" /></div></div><div className="flex justify-end gap-3 mt-6"><button onClick={() => setShowModal(false)} className="px-4 py-2 text-gray-600 hover:bg-gray-100 rounded-lg">取消</button><button onClick={handleCreate} className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700">创建项目</button></div></div>)}
+                    {selectedProject && (<div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50"><div className="bg-white rounded-xl w-full max-w-2xl p-6" onClick={e => e.stopPropagation()}><div className="flex justify-between items-center mb-6"><div><h3 className="text-xl font-bold">{selectedProject.name}</h3><p className="text-gray-500">{selectedProject.client}</p></div><div className="flex items-center gap-3"><select value={selectedProject.stage} onChange={e => { updateStage(selectedProject.id, e.target.value); setSelectedProject({...selectedProject, stage: e.target.value}); }} className="px-3 py-2 border rounded-lg">{STAGES.map(s => <option key={s} value={s}>{s}</option>)}</select><button onClick={() => setSelectedProject(null)} className="text-gray-500"><i className="fas fa-times text-xl"></i></button></div></div></div>)}
                 </div>
             );
         };
 
-        // ========== 模块06: 系统设置 ==========
-        const SettingsModule = () => {
-            const { companies, tenderData, bids, projects } = useApp();
-            const [activeTab, setActiveTab] = useState('general');
-            const [toast, setToast] = useState(null);
-            const showToast = (msg) => { setToast(msg); setTimeout(() => setToast(null), 3000); };
-            const exportData = () => { const data = { companies, tenderData, bids, projects, exportedAt: new Date().toISOString() }; const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' }); const url = URL.createObjectURL(blob); const a = document.createElement('a'); a.href = url; a.download = `招投标数据_${new Date().toISOString().split('T')[0]}.json`; a.click(); URL.revokeObjectURL(url); showToast('数据导出成功'); };
-            const clearAllData = () => { if (confirm('确定清空所有数据？此操作不可恢复！')) { localStorage.clear(); showToast('数据已清空'); window.location.reload(); } };
-            return (
-                <div className="p-6 fade-in">
-                    {toast && <div className="fixed top-4 right-4 px-4 py-3 rounded-lg shadow-lg z-50 bg-green-500 text-white fade-in"><i className="fas fa-check-circle mr-2"></i>{toast}</div>}
-                    <h2 className="text-2xl font-bold text-gray-800 mb-6"><i className="fas fa-cog mr-3 text-gray-600"></i>系统设置</h2>
-                    <div className="flex gap-6">
-                        <div className="w-48"><div className="bg-white rounded-xl shadow p-2">{[{ id: 'general', label: '常规设置', icon: 'fa-cog' }, { id: 'data', label: '数据管理', icon: 'fa-database' }, { id: 'about', label: '关于', icon: 'fa-info-circle' }].map(tab => (<div key={tab.id} onClick={() => setActiveTab(tab.id)} className={`flex items-center px-4 py-3 rounded-lg cursor-pointer transition ${activeTab === tab.id ? 'bg-indigo-50 text-indigo-600' : 'text-gray-600 hover:bg-gray-50'}`}><i className={`fas ${tab.icon} w-5`}></i><span className="ml-3 text-sm">{tab.label}</span></div>))}</div></div>
-                        <div className="flex-1">
-                            {activeTab === 'general' && (<div className="bg-white rounded-xl shadow p-6"><h3 className="font-bold mb-4">常规设置</h3><div className="space-y-4"><div className="flex items-center justify-between py-3 border-b"><div><div className="font-medium">自动保存</div><div className="text-sm text-gray-500">自动保存编辑中的内容</div></div><input type="checkbox" defaultChecked className="w-5 h-5" /></div><div className="flex items-center justify-between py-3 border-b"><div><div className="font-medium">消息通知</div><div className="text-sm text-gray-500">接收投标截止提醒</div></div><input type="checkbox" defaultChecked className="w-5 h-5" /></div></div></div>)}
-                            {activeTab === 'data' && (<div className="space-y-6"><div className="bg-white rounded-xl shadow p-6"><h3 className="font-bold mb-4">数据统计</h3><div className="grid grid-cols-4 gap-4"><div className="text-center p-4 bg-blue-50 rounded-lg"><div className="text-2xl font-bold text-blue-600">{companies.length}</div><div className="text-xs text-gray-500">企业信息</div></div><div className="text-center p-4 bg-green-50 rounded-lg"><div className="text-2xl font-bold text-green-600">{tenderData ? 1 : 0}</div><div className="text-xs text-gray-500">招标文件</div></div><div className="text-center p-4 bg-purple-50 rounded-lg"><div className="text-2xl font-bold text-purple-600">{bids.length}</div><div className="text-xs text-gray-500">标书历史</div></div><div className="text-center p-4 bg-orange-50 rounded-lg"><div className="text-2xl font-bold text-orange-600">{projects.length}</div><div className="text-xs text-gray-500">项目</div></div></div></div><div className="bg-white rounded-xl shadow p-6"><h3 className="font-bold mb-4">导入导出</h3><div className="grid grid-cols-2 gap-4"><button onClick={exportData} className="p-4 border-2 border-dashed border-gray-300 rounded-lg hover:border-indigo-500 hover:bg-indigo-50 transition text-center"><i className="fas fa-download text-2xl text-gray-400 mb-2"></i><div className="font-medium">导出数据</div><div className="text-xs text-gray-500">备份所有投标数据</div></button><div className="p-4 border-2 border-dashed border-gray-300 rounded-lg text-center"><i className="fas fa-upload text-2xl text-gray-400 mb-2"></i><div className="font-medium">导入数据</div><div className="text-xs text-gray-500">从备份恢复数据</div></div></div></div><div className="bg-white rounded-xl shadow p-6"><h3 className="font-bold mb-4 text-red-600"><i className="fas fa-exclamation-triangle mr-2"></i>危险操作</h3><button onClick={clearAllData} className="px-4 py-2 bg-red-100 text-red-600 rounded-lg hover:bg-red-200"><i className="fas fa-trash mr-2"></i>清空所有数据</button></div></div>)}
-                            {activeTab === 'about' && (<div className="bg-white rounded-xl shadow p-8 text-center"><div className="w-20 h-20 bg-indigo-100 rounded-2xl flex items-center justify-center mx-auto mb-4"><i className="fas fa-robot text-4xl text-indigo-600"></i></div><h3 className="text-xl font-bold">招投标AI智能体</h3><p className="text-gray-500 mt-1">版本 2.0.0</p><div className="mt-6 text-sm text-gray-600">全流程智能化招投标管理平台</div><div className="mt-8 grid grid-cols-3 gap-4"><div><div className="text-2xl font-bold text-indigo-600">11</div><div className="text-xs text-gray-500">核心模块</div></div><div><div className="text-2xl font-bold text-indigo-600">26+</div><div className="text-xs text-gray-500">检查规则</div></div><div><div className="text-2xl font-bold text-indigo-600">100%</div><div className="text-xs text-gray-500">本地运行</div></div></div></div>)}
-                        </div>
-                    </div>
-                </div>
-            );
-        };
-
-        // ========== 模块07: 图表生成 ==========
+        // ========== CHART MODULE ==========
         const ChartModule = () => {
             const [chartType, setChartType] = useState('gantt');
             const [generating, setGenerating] = useState(false);
             const [generatedChart, setGeneratedChart] = useState(null);
-            const [form, setForm] = useState({ projectName: '', duration: 120, tasks: [{ name: '施工准备', duration: 15, dependency: '' }, { name: '基础施工', duration: 30, dependency: '施工准备' }, { name: '主体结构', duration: 45, dependency: '基础施工' }, { name: '装饰装修', duration: 30, dependency: '主体结构' }, { name: '竣工验收', duration: 15, dependency: '装饰装修' }] });
-            const chartTypes = [{ id: 'gantt', label: '横道图', icon: 'fa-chart-bar', desc: '甘特图展示项目进度', color: 'blue' }, { id: 'network', label: '网络图', icon: 'fa-project-diagram', desc: '关键路径法网络图', color: 'purple' }];
+            const [form, setForm] = useState({ projectName: '', duration: 120, tasks: [{ name: '施工准备', duration: 15 }, { name: '基础施工', duration: 30 }, { name: '主体结构', duration: 45 }, { name: '装饰装修', duration: 30 }, { name: '竣工验收', duration: 15 }] });
+            const chartTypes = [{ id: 'gantt', label: '横道图', icon: 'fa-chart-bar', desc: '甘特图展示项目进度' }, { id: 'network', label: '网络图', icon: 'fa-project-diagram', desc: '关键路径法网络图' }];
             const handleGenerate = async () => { setGenerating(true); await new Promise(r => setTimeout(r, 2000)); setGeneratedChart({ type: chartType, data: form, generatedAt: new Date().toISOString() }); setGenerating(false); };
-            const addTask = () => setForm({ ...form, tasks: [...form.tasks, { name: '', duration: 10, dependency: '' }] });
+            const addTask = () => setForm({ ...form, tasks: [...form.tasks, { name: '', duration: 10 }] });
             const updateTask = (i, f, v) => { const t = [...form.tasks]; t[i] = { ...t[i], [f]: v }; setForm({ ...form, tasks: t }); };
             const removeTask = (i) => setForm({ ...form, tasks: form.tasks.filter((_, j) => j !== i) });
             return (
                 <div className="p-6 fade-in">
                     <h2 className="text-2xl font-bold text-gray-800 mb-6"><i className="fas fa-chart-bar mr-3 text-orange-600"></i>图表生成</h2>
                     <div className="bg-white rounded-xl shadow p-6 mb-6"><h3 className="font-semibold mb-4">选择图表类型</h3><div className="grid grid-cols-2 gap-4">{chartTypes.map(type => (<div key={type.id} onClick={() => setChartType(type.id)} className={`p-6 rounded-xl border-2 cursor-pointer transition ${chartType === type.id ? 'border-blue-500 bg-blue-50' : 'border-gray-200 hover:border-gray-300'}`}><div className="w-12 h-12 rounded-lg bg-blue-100 flex items-center justify-center mb-4"><i className={`fas ${type.icon} text-xl text-blue-600`}></i></div><h4 className="font-bold mb-2">{type.label}</h4><p className="text-sm text-gray-500">{type.desc}</p></div>))}</div></div>
-                    <div className="grid grid-cols-3 gap-6">
-                        <div className="col-span-2 space-y-6">
-                            <div className="bg-white rounded-xl shadow p-6"><h4 className="font-semibold mb-4">项目配置</h4><div className="grid grid-cols-2 gap-4"><div><label className="block text-sm text-gray-500 mb-1">项目名称</label><input type="text" value={form.projectName} onChange={e => setForm({...form, projectName: e.target.value})} placeholder="输入项目名称" className="w-full px-3 py-2 border rounded-lg" /></div><div><label className="block text-sm text-gray-500 mb-1">总工期（天）</label><input type="number" value={form.duration} onChange={e => setForm({...form, duration: parseInt(e.target.value)})} className="w-full px-3 py-2 border rounded-lg" /></div></div></div>
-                            <div className="bg-white rounded-xl shadow p-6"><div className="flex justify-between items-center mb-4"><h4 className="font-semibold">任务配置</h4><button onClick={addTask} className="px-3 py-1.5 bg-blue-50 text-blue-600 rounded-lg hover:bg-blue-100"><i className="fas fa-plus mr-1"></i>添加任务</button></div><div className="space-y-3">{form.tasks.map((task, i) => (<div key={i} className="flex items-center gap-3 p-3 bg-gray-50 rounded-lg"><div className="w-8 h-8 bg-blue-100 text-blue-600 rounded flex items-center justify-center font-bold text-sm">{i + 1}</div><input type="text" value={task.name} onChange={e => updateTask(i, 'name', e.target.value)} placeholder="任务名称" className="flex-1 px-3 py-2 border rounded-lg text-sm" /><input type="number" value={task.duration} onChange={e => updateTask(i, 'duration', parseInt(e.target.value))} className="w-20 px-3 py-2 border rounded-lg text-sm" /><span className="text-sm text-gray-500">天</span><button onClick={() => removeTask(i)} className="text-red-500 hover:text-red-700 px-2"><i className="fas fa-trash"></i></button></div>))}</div></div>
-                        </div>
-                        <div className="space-y-6">
-                            <div className="bg-white rounded-xl shadow p-6"><h4 className="font-semibold mb-4">生成设置</h4><div className="space-y-3 text-sm"><div className="flex justify-between"><span className="text-gray-500">图表类型</span><span className="font-medium">{chartTypes.find(t => t.id === chartType).label}</span></div><div className="flex justify-between"><span className="text-gray-500">任务数量</span><span className="font-medium">{form.tasks.length} 个</span></div></div><button onClick={handleGenerate} disabled={generating || !form.projectName} className={`w-full mt-4 py-3 rounded-xl font-bold transition ${generating || !form.projectName ? 'bg-gray-300 cursor-not-allowed' : 'bg-orange-600 text-white hover:bg-orange-700'}`}>{generating ? <><i className="fas fa-spinner fa-spin mr-2"></i>生成中...</> : <><i className="fas fa-magic mr-2"></i>生成图表</>}</button></div>
-                        </div>
-                    </div>
+                    <div className="grid grid-cols-3 gap-6"><div className="col-span-2 space-y-6"><div className="bg-white rounded-xl shadow p-6"><h4 className="font-semibold mb-4">项目配置</h4><div className="grid grid-cols-2 gap-4"><div><label className="block text-sm text-gray-500 mb-1">项目名称</label><input type="text" value={form.projectName} onChange={e => setForm({...form, projectName: e.target.value})} placeholder="输入项目名称" className="w-full px-3 py-2 border rounded-lg" /></div><div><label className="block text-sm text-gray-500 mb-1">总工期（天）</label><input type="number" value={form.duration} onChange={e => setForm({...form, duration: parseInt(e.target.value)})} className="w-full px-3 py-2 border rounded-lg" /></div></div></div><div className="bg-white rounded-xl shadow p-6"><div className="flex justify-between items-center mb-4"><h4 className="font-semibold">任务配置</h4><button onClick={addTask} className="px-3 py-1.5 bg-blue-50 text-blue-600 rounded-lg hover:bg-blue-100"><i className="fas fa-plus mr-1"></i>添加任务</button></div><div className="space-y-3">{form.tasks.map((task, i) => (<div key={i} className="flex items-center gap-3 p-3 bg-gray-50 rounded-lg"><div className="w-8 h-8 bg-blue-100 text-blue-600 rounded flex items-center justify-center font-bold text-sm">{i + 1}</div><input type="text" value={task.name} onChange={e => updateTask(i, 'name', e.target.value)} placeholder="任务名称" className="flex-1 px-3 py-2 border rounded-lg text-sm" /><input type="number" value={task.duration} onChange={e => updateTask(i, 'duration', parseInt(e.target.value))} className="w-20 px-3 py-2 border rounded-lg text-sm" /><span className="text-sm text-gray-500">天</span><button onClick={() => removeTask(i)} className="text-red-500 hover:text-red-700 px-2"><i className="fas fa-trash"></i></button></div>))}</div></div></div><div className="space-y-6"><div className="bg-white rounded-xl shadow p-6"><h4 className="font-semibold mb-4">生成设置</h4><div className="space-y-3 text-sm"><div className="flex justify-between"><span className="text-gray-500">图表类型</span><span className="font-medium">{chartTypes.find(t => t.id === chartType).label}</span></div><div className="flex justify-between"><span className="text-gray-500">任务数量</span><span className="font-medium">{form.tasks.length} 个</span></div></div><button onClick={handleGenerate} disabled={generating || !form.projectName} className={`w-full mt-4 py-3 rounded-xl font-bold transition ${generating || !form.projectName ? 'bg-gray-300 cursor-not-allowed' : 'bg-orange-600 text-white hover:bg-orange-700'}`}>{generating ? <><i className="fas fa-spinner fa-spin mr-2"></i>生成中...</> : <><i className="fas fa-magic mr-2"></i>生成图表</>}</button></div></div></div>
                     {generatedChart && !generating && (<div className="mt-6 bg-white rounded-xl shadow p-6"><div className="flex items-center justify-between mb-4"><h3 className="font-semibold text-lg"><i className="fas fa-chart-bar text-orange-500 mr-2"></i>{chartTypes.find(t => t.id === generatedChart.type).label}预览</h3><button onClick={() => setGeneratedChart(null)} className="px-4 py-2 bg-gray-50 text-gray-600 rounded-lg"><i className="fas fa-redo mr-2"></i>重新生成</button></div><div className="border rounded-lg overflow-hidden"><div className="bg-gray-50 p-4 border-b"><div className="font-bold text-lg">{generatedChart.data.projectName}</div><div className="text-sm text-gray-500">总工期：{generatedChart.data.duration}天</div></div><div className="p-6 overflow-x-auto">{generatedChart.type === 'gantt' ? (<div className="min-w-[600px]"><div className="flex border-b pb-2 mb-2"><div className="w-32 font-semibold">任务名称</div><div className="flex-1 flex">{Array.from({length: Math.min(generatedChart.data.duration, 30)}, (_, i) => (<div key={i} className="flex-1 text-center text-xs text-gray-400 border-l px-1">{i + 1}</div>))}</div></div>{generatedChart.data.tasks.map((task, i) => (<div key={i} className="flex items-center border-b py-2"><div className="w-32 text-sm">{task.name}</div><div className="flex-1 flex">{Array.from({length: Math.min(generatedChart.data.duration, 30)}, (_, j) => (<div key={j} className={`flex-1 h-6 border-l ${j < task.duration ? 'bg-blue-400' : 'bg-gray-100'}`}></div>))}</div><div className="w-16 text-center text-sm text-gray-500">{task.duration}天</div></div>))}</div>) : (<div className="flex justify-center items-center py-12 text-gray-500"><div className="text-center"><i className="fas fa-project-diagram text-6xl text-purple-300 mb-4"></i><p>网络图预览</p></div></div>)}</div></div></div>)}
                 </div>
             );
         };
 
-        // ========== 模块08: 工程施工附表 ==========
+        // ========== CONSTRUCTION MODULE ==========
         const ConstructionModule = () => {
             const [activeTable, setActiveTable] = useState('schedule');
             const [generating, setGenerating] = useState(false);
             const [generatedTable, setGeneratedTable] = useState(null);
-            const tableTypes = [{ id: 'schedule', label: '进度计划表', icon: 'fa-calendar-alt', color: 'blue' }, { id: 'labor', label: '劳动力计划表', icon: 'fa-users', color: 'green' }, { id: 'equipment', label: '机械设备表', icon: 'fa-truck', color: 'orange' }, { id: 'material', label: '材料需求表', icon: 'fa-boxes', color: 'purple' }, { id: 'quality', label: '质量控制表', icon: 'fa-check-double', color: 'red' }];
-            const mockData = {
-                schedule: { title: '施工进度计划表', headers: ['序号', '工作内容', '开始时间', '结束时间', '持续天数'], rows: [['1', '施工准备', '2024-03-01', '2024-03-15', '15天'], ['2', '基础工程', '2024-03-16', '2024-04-15', '30天'], ['3', '主体结构', '2024-04-16', '2024-06-01', '45天'], ['4', '装饰装修', '2024-06-02', '2024-07-01', '30天'], ['5', '竣工验收', '2024-07-02', '2024-07-15', '15天']] },
-                labor: { title: '劳动力计划表', headers: ['工种', '人数', '工作天数', '备注'], rows: [['木工', '15人', '60天', '模板制作安装'], ['钢筋工', '20人', '50天', '钢筋加工绑扎'], ['混凝土工', '12人', '45天', '混凝土浇筑'], ['瓦工', '10人', '40天', '砌体施工'], ['水电工', '8人', '30天', '水电安装']] },
-                equipment: { title: '机械设备计划表', headers: ['设备名称', '规格型号', '数量', '进场时间'], rows: [['塔吊', 'QTZ63', '1台', '第1个月'], ['施工电梯', 'SC200/200', '1台', '第2个月'], ['混凝土泵车', 'HBT60', '1台', '第2个月'], ['钢筋加工设备', '全套', '1套', '第1个月']] },
-                material: { title: '主要材料需求表', headers: ['材料名称', '规格', '单位', '数量', '进场时间'], rows: [['钢筋', 'HRB400', '吨', '350', '分批进场'], ['混凝土', 'C30', '立方米', '1200', '按进度供应'], ['模板', '1830*915', '平方米', '2500', '分批进场'], ['钢管', 'Φ48*3.5', '吨', '80', '按需进场']] },
-                quality: { title: '质量控制计划表', headers: ['控制项目', '控制标准', '检验方法', '检验频率'], rows: [['钢筋工程', '符合GB50204', '现场检测', '每批必检'], ['混凝土工程', '符合GB50204', '试块检验', '每100m³一组'], ['模板工程', '垂直度≤5mm', '仪器测量', '每层必检'], ['砌体工程', '符合GB50203', '现场检查', '每500m²一组'], ['防水工程', '符合GB50208', '闭水试验', '每处必检']] }
-            };
+            const tableTypes = [{ id: 'schedule', label: '进度计划表', icon: 'fa-calendar-alt' }, { id: 'labor', label: '劳动力计划表', icon: 'fa-users' }, { id: 'equipment', label: '机械设备表', icon: 'fa-truck' }, { id: 'material', label: '材料需求表', icon: 'fa-boxes' }, { id: 'quality', label: '质量控制表', icon: 'fa-check-double' }];
+            const mockData = { schedule: { title: '施工进度计划表', headers: ['序号', '工作内容', '开始时间', '结束时间', '持续天数'], rows: [['1', '施工准备', '2024-03-01', '2024-03-15', '15天'], ['2', '基础工程', '2024-03-16', '2024-04-15', '30天'], ['3', '主体结构', '2024-04-16', '2024-06-01', '45天'], ['4', '装饰装修', '2024-06-02', '2024-07-01', '30天'], ['5', '竣工验收', '2024-07-02', '2024-07-15', '15天']] }, labor: { title: '劳动力计划表', headers: ['工种', '人数', '工作天数', '备注'], rows: [['木工', '15人', '60天', '模板制作安装'], ['钢筋工', '20人', '50天', '钢筋加工绑扎'], ['混凝土工', '12人', '45天', '混凝土浇筑'], ['瓦工', '10人', '40天', '砌体施工'], ['水电工', '8人', '30天', '水电安装']] }, equipment: { title: '机械设备计划表', headers: ['设备名称', '规格型号', '数量', '进场时间'], rows: [['塔吊', 'QTZ63', '1台', '第1个月'], ['施工电梯', 'SC200/200', '1台', '第2个月'], ['混凝土泵车', 'HBT60', '1台', '第2个月'], ['钢筋加工设备', '全套', '1套', '第1个月']] }, material: { title: '主要材料需求表', headers: ['材料名称', '规格', '单位', '数量', '进场时间'], rows: [['钢筋', 'HRB400', '吨', '350', '分批进场'], ['混凝土', 'C30', '立方米', '1200', '按进度供应'], ['模板', '1830*915', '平方米', '2500', '分批进场'], ['钢管', 'Φ48*3.5', '吨', '80', '按需进场']] }, quality: { title: '质量控制计划表', headers: ['控制项目', '控制标准', '检验方法', '检验频率'], rows: [['钢筋工程', '符合GB50204', '现场检测', '每批必检'], ['混凝土工程', '符合GB50204', '试块检验', '每100m³一组'], ['模板工程', '垂直度≤5mm', '仪器测量', '每层必检'], ['砌体工程', '符合GB50203', '现场检查', '每500m²一组'], ['防水工程', '符合GB50208', '闭水试验', '每处必检']] } };
             const handleGenerate = async () => { setGenerating(true); await new Promise(r => setTimeout(r, 1500)); setGeneratedTable(mockData[activeTable]); setGenerating(false); };
             const ct = tableTypes.find(t => t.id === activeTable);
             return (
@@ -535,13 +646,13 @@
             );
         };
 
-        // ========== 模块09: 平面布置图 ==========
+        // ========== LAYOUT MODULE ==========
         const LayoutModule = () => {
             const [layoutType, setLayoutType] = useState('construction');
             const [generating, setGenerating] = useState(false);
             const [generatedLayout, setGeneratedLayout] = useState(null);
             const [form, setForm] = useState({ projectName: '', totalArea: '', buildingArea: '', features: [] });
-            const layoutTypes = [{ id: 'construction', label: '施工总平面', icon: 'fa-building', color: 'blue' }, { id: 'temporary', label: '临时设施', icon: 'fa-campground', color: 'green' }, { id: 'vertical', label: '垂直运输', icon: 'fa-arrows-alt-v', color: 'orange' }, { id: 'water', label: '给排水', icon: 'fa-tint', color: 'cyan' }, { id: 'electric', label: '用电布置', icon: 'fa-bolt', color: 'yellow' }];
+            const layoutTypes = [{ id: 'construction', label: '施工总平面', icon: 'fa-building' }, { id: 'temporary', label: '临时设施', icon: 'fa-campground' }, { id: 'vertical', label: '垂直运输', icon: 'fa-arrows-alt-v' }, { id: 'water', label: '给排水', icon: 'fa-tint' }, { id: 'electric', label: '用电布置', icon: 'fa-bolt' }];
             const features = [{ id: 'office', label: '办公区', icon: 'fa-building' }, { id: 'dormitory', label: '生活区', icon: 'fa-home' }, { id: 'warehouse', label: '材料仓库', icon: 'fa-warehouse' }, { id: 'mixing', label: '搅拌站', icon: 'fa-blender' }, { id: 'tower', label: '塔吊', icon: 'fa-crane' }, { id: 'parking', label: '停车区', icon: 'fa-car' }, { id: 'green', label: '绿化区', icon: 'fa-leaf' }, { id: 'road', label: '施工道路', icon: 'fa-road' }];
             const handleGenerate = async () => { setGenerating(true); await new Promise(r => setTimeout(r, 2000)); setGeneratedLayout({ type: layoutType, data: form, generatedAt: new Date().toISOString() }); setGenerating(false); };
             const toggleFeature = (id) => setForm({ ...form, features: form.features.includes(id) ? form.features.filter(f => f !== id) : [...form.features, id] });
@@ -549,68 +660,77 @@
                 <div className="p-6 fade-in">
                     <h2 className="text-2xl font-bold text-gray-800 mb-6"><i className="fas fa-map mr-3 text-cyan-600"></i>平面布置图</h2>
                     <div className="bg-white rounded-xl shadow p-6 mb-6"><h3 className="font-semibold mb-4">选择布置类型</h3><div className="grid grid-cols-5 gap-4">{layoutTypes.map(type => (<div key={type.id} onClick={() => setLayoutType(type.id)} className={`p-4 rounded-xl border-2 cursor-pointer transition text-center ${layoutType === type.id ? 'border-blue-500 bg-blue-50' : 'border-gray-200 hover:border-gray-300'}`}><div className="w-12 h-12 rounded-lg bg-blue-100 flex items-center justify-center mx-auto mb-3"><i className={`fas ${type.icon} text-xl text-blue-600`}></i></div><h4 className="font-medium text-sm">{type.label}</h4></div>))}</div></div>
-                    <div className="grid grid-cols-3 gap-6">
-                        <div className="col-span-2 space-y-6">
-                            <div className="bg-white rounded-xl shadow p-6"><h4 className="font-semibold mb-4">基本信息</h4><div className="grid grid-cols-3 gap-4"><div><label className="block text-sm text-gray-500 mb-1">项目名称</label><input type="text" value={form.projectName} onChange={e => setForm({...form, projectName: e.target.value})} placeholder="输入项目名称" className="w-full px-3 py-2 border rounded-lg" /></div><div><label className="block text-sm text-gray-500 mb-1">占地面积(m²)</label><input type="text" value={form.totalArea} onChange={e => setForm({...form, totalArea: e.target.value})} placeholder="如：5000" className="w-full px-3 py-2 border rounded-lg" /></div><div><label className="block text-sm text-gray-500 mb-1">建筑面积(m²)</label><input type="text" value={form.buildingArea} onChange={e => setForm({...form, buildingArea: e.target.value})} placeholder="如：12000" className="w-full px-3 py-2 border rounded-lg" /></div></div></div>
-                            <div className="bg-white rounded-xl shadow p-6"><h4 className="font-semibold mb-4">设施配置</h4><div className="grid grid-cols-4 gap-3">{features.map(f => (<div key={f.id} onClick={() => toggleFeature(f.id)} className={`p-3 rounded-lg border-2 cursor-pointer transition text-center ${form.features.includes(f.id) ? 'border-cyan-500 bg-cyan-50' : 'border-gray-200 hover:border-gray-300'}`}><i className={`fas ${f.icon} text-cyan-600 mb-2`}></i><div className="text-sm">{f.label}</div></div>))}</div></div>
-                        </div>
-                        <div className="space-y-6">
-                            <div className="bg-white rounded-xl shadow p-6"><h4 className="font-semibold mb-4">配置信息</h4><div className="space-y-3 text-sm"><div className="flex justify-between"><span className="text-gray-500">布置类型</span><span className="font-medium">{layoutTypes.find(t => t.id === layoutType).label}</span></div><div className="flex justify-between"><span className="text-gray-500">已选设施</span><span className="font-medium">{form.features.length} 个</span></div></div><button onClick={handleGenerate} disabled={generating || !form.projectName} className={`w-full mt-4 py-3 rounded-xl font-bold transition ${generating || !form.projectName ? 'bg-gray-300 cursor-not-allowed' : 'bg-cyan-600 text-white hover:bg-cyan-700'}`}>{generating ? <><i className="fas fa-spinner fa-spin mr-2"></i>生成中...</> : <><i className="fas fa-magic mr-2"></i>生成布置图</>}</button></div>
-                        </div>
-                    </div>
-                    {generatedLayout && !generating && (<div className="mt-6 bg-white rounded-xl shadow p-6"><div className="flex items-center justify-between mb-4"><h3 className="font-semibold text-lg"><i className="fas fa-map text-cyan-500 mr-2"></i>{layoutTypes.find(t => t.id === generatedLayout.type).label}预览</h3><button onClick={() => setGeneratedLayout(null)} className="px-4 py-2 bg-gray-50 text-gray-600 rounded-lg"><i className="fas fa-redo mr-2"></i>重新生成</button></div><div className="border rounded-lg overflow-hidden"><div className="bg-gray-50 p-4 border-b"><div className="font-bold text-lg">{generatedLayout.data.projectName}</div><div className="text-sm text-gray-500">占地：{generatedLayout.data.totalArea || '-'}m² | 建筑：{generatedLayout.data.buildingArea || '-'}m²</div></div><div className="p-8 bg-gray-100 min-h-[400px] flex items-center justify-center"><div className="text-center"><i className="fas fa-map-marked-alt text-8xl text-cyan-300 mb-4"></i><p className="text-gray-500 font-medium">平面布置图已生成</p><p className="text-sm text-gray-400 mt-2">点击下载获取完整图纸</p></div></div></div></div>)}
+                    <div className="grid grid-cols-3 gap-6"><div className="col-span-2 space-y-6"><div className="bg-white rounded-xl shadow p-6"><h4 className="font-semibold mb-4">基本信息</h4><div className="grid grid-cols-3 gap-4"><div><label className="block text-sm text-gray-500 mb-1">项目名称</label><input type="text" value={form.projectName} onChange={e => setForm({...form, projectName: e.target.value})} placeholder="输入项目名称" className="w-full px-3 py-2 border rounded-lg" /></div><div><label className="block text-sm text-gray-500 mb-1">占地面积</label><input type="text" value={form.totalArea} onChange={e => setForm({...form, totalArea: e.target.value})} placeholder="如：5000" className="w-full px-3 py-2 border rounded-lg" /></div><div><label className="block text-sm text-gray-500 mb-1">建筑面积</label><input type="text" value={form.buildingArea} onChange={e => setForm({...form, buildingArea: e.target.value})} placeholder="如：12000" className="w-full px-3 py-2 border rounded-lg" /></div></div></div><div className="bg-white rounded-xl shadow p-6"><h4 className="font-semibold mb-4">设施配置</h4><div className="grid grid-cols-4 gap-3">{features.map(f => (<div key={f.id} onClick={() => toggleFeature(f.id)} className={`p-3 rounded-lg border-2 cursor-pointer text-center transition ${form.features.includes(f.id) ? 'border-blue-500 bg-blue-50' : 'border-gray-200'}`}><i className={`fas ${f.icon} text-lg ${form.features.includes(f.id) ? 'text-blue-600' : 'text-gray-400'}`}></i><div className="text-xs mt-1">{f.label}</div></div>))}</div></div></div><div className="space-y-6"><div className="bg-white rounded-xl shadow p-6"><h4 className="font-semibold mb-4">生成设置</h4><div className="space-y-3 text-sm"><div className="flex justify-between"><span className="text-gray-500">布置类型</span><span className="font-medium">{layoutTypes.find(t => t.id === layoutType).label}</span></div><div className="flex justify-between"><span className="text-gray-500">设施数量</span><span className="font-medium">{form.features.length} 个</span></div></div><button onClick={handleGenerate} disabled={generating || !form.projectName} className={`w-full mt-4 py-3 rounded-xl font-bold transition ${generating || !form.projectName ? 'bg-gray-300 cursor-not-allowed' : 'bg-cyan-600 text-white hover:bg-cyan-700'}`}>{generating ? <><i className="fas fa-spinner fa-spin mr-2"></i>生成中...</> : <><i className="fas fa-magic mr-2"></i>生成布置图</>}</button></div></div></div>
+                    {generatedLayout && !generating && (<div className="mt-6 bg-white rounded-xl shadow p-6"><div className="flex items-center justify-between mb-4"><h3 className="font-semibold text-lg">平面布置图预览</h3><button onClick={() => setGeneratedLayout(null)} className="px-4 py-2 bg-gray-50 text-gray-600 rounded-lg"><i className="fas fa-redo mr-2"></i>重新生成</button></div><div className="border rounded-lg bg-gray-50 aspect-video flex items-center justify-center"><div className="text-center"><i className="fas fa-map text-6xl text-cyan-300 mb-4"></i><p className="text-gray-500">{generatedLayout.data.projectName} - {layoutTypes.find(t => t.id === generatedLayout.type).label}</p><p className="text-sm text-gray-400 mt-2">平面布置图已生成，可下载查看</p></div></div></div>)}
                 </div>
             );
         };
 
-        // ========== 模块10: AI生图 ==========
+        // ========== IMAGE GEN MODULE ==========
         const ImageGenModule = () => {
-            const [imageType, setImageType] = useState('architecture');
+            const [prompt, setPrompt] = useState('');
+            const [style, setStyle] = useState('realistic');
             const [generating, setGenerating] = useState(false);
             const [generatedImages, setGeneratedImages] = useState([]);
-            const [form, setForm] = useState({ projectName: '', description: '', style: 'professional' });
-            const imageTypes = [{ id: 'architecture', label: '组织架构图', icon: 'fa-sitemap', color: 'blue' }, { id: 'timeline', label: '时间轴', icon: 'fa-clock', color: 'purple' }, { id: 'flowchart', label: '流程图', icon: 'fa-project-diagram', color: 'green' }, { id: 'batch', label: '批量配图', icon: 'fa-images', color: 'orange' }, { id: 'tech', label: '技术架构图', icon: 'fa-microchip', color: 'cyan' }];
-            const styles = [{ id: 'professional', label: '专业商务' }, { id: 'modern', label: '现代简约' }, { id: 'creative', label: '创意活泼' }, { id: 'tech', label: '科技感' }];
-            const handleGenerate = async () => { setGenerating(true); await new Promise(r => setTimeout(r, 2000)); setGeneratedImages([{ id: generateId(), type: imageType, createdAt: new Date().toISOString() }, ...generatedImages]); setGenerating(false); };
+            const styles = [{ id: 'realistic', label: '写实风格' }, { id: 'technical', label: '技术图纸' }, { id: 'architectural', label: '建筑效果图' }, { id: 'schematic', label: '示意图' }];
+            const handleGenerate = async () => { if (!prompt) return; setGenerating(true); await new Promise(r => setTimeout(r, 3000)); setGeneratedImages([{ id: generateId(), prompt, style, createdAt: new Date().toISOString() }, ...generatedImages]); setGenerating(false); };
             return (
                 <div className="p-6 fade-in">
                     <h2 className="text-2xl font-bold text-gray-800 mb-6"><i className="fas fa-image mr-3 text-pink-600"></i>AI生图</h2>
-                    <div className="bg-white rounded-xl shadow p-6 mb-6"><h3 className="font-semibold mb-4">选择图片类型</h3><div className="grid grid-cols-5 gap-4">{imageTypes.map(type => (<div key={type.id} onClick={() => setImageType(type.id)} className={`p-4 rounded-xl border-2 cursor-pointer transition text-center ${imageType === type.id ? 'border-blue-500 bg-blue-50' : 'border-gray-200 hover:border-gray-300'}`}><div className="w-12 h-12 rounded-lg bg-blue-100 flex items-center justify-center mx-auto mb-3"><i className={`fas ${type.icon} text-xl text-blue-600`}></i></div><h4 className="font-medium text-sm">{type.label}</h4></div>))}</div></div>
                     <div className="grid grid-cols-3 gap-6">
                         <div className="col-span-2 space-y-6">
-                            <div className="bg-white rounded-xl shadow p-6"><h4 className="font-semibold mb-4">图片配置</h4><div className="space-y-4"><div><label className="block text-sm text-gray-500 mb-1">项目/主题名称</label><input type="text" value={form.projectName} onChange={e => setForm({...form, projectName: e.target.value})} placeholder="输入项目名称" className="w-full px-3 py-2 border rounded-lg" /></div><div><label className="block text-sm text-gray-500 mb-1">详细描述</label><textarea value={form.description} onChange={e => setForm({...form, description: e.target.value})} placeholder="描述图片内容..." rows="3" className="w-full px-3 py-2 border rounded-lg"></textarea></div><div><label className="block text-sm text-gray-500 mb-2">风格选择</label><div className="flex gap-3">{styles.map(s => (<div key={s.id} onClick={() => setForm({...form, style: s.id})} className={`px-4 py-2 rounded-lg border-2 cursor-pointer transition ${form.style === s.id ? 'border-pink-500 bg-pink-50 text-pink-600' : 'border-gray-200 hover:border-gray-300'}`}>{s.label}</div>))}</div></div></div></div>
+                            <div className="bg-white rounded-xl shadow p-6"><h4 className="font-semibold mb-4">生成设置</h4><div className="space-y-4"><div><label className="block text-sm text-gray-500 mb-1">图片描述</label><textarea value={prompt} onChange={e => setPrompt(e.target.value)} rows="3" placeholder="描述你想要生成的图片内容..." className="w-full px-3 py-2 border rounded-lg"></textarea></div><div><label className="block text-sm text-gray-500 mb-2">图片风格</label><div className="flex gap-3">{styles.map(s => (<button key={s.id} onClick={() => setStyle(s.id)} className={`px-4 py-2 rounded-lg text-sm font-medium transition ${style === s.id ? 'bg-blue-600 text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}`}>{s.label}</button>))}</div></div></div></div>
+                            <div className="grid grid-cols-2 gap-4">{generatedImages.map(img => (<div key={img.id} className="bg-white rounded-xl shadow overflow-hidden"><div className="aspect-video bg-gradient-to-br from-pink-100 to-purple-100 flex items-center justify-center"><i className="fas fa-image text-4xl text-pink-300"></i></div><div className="p-3"><p className="text-sm text-gray-600 truncate">{img.prompt}</p><p className="text-xs text-gray-400 mt-1">{styles.find(s => s.id === img.style)?.label} | {new Date(img.createdAt).toLocaleString('zh-CN')}</p></div></div>))}</div>
                         </div>
-                        <div className="space-y-6">
-                            <div className="bg-white rounded-xl shadow p-6"><h4 className="font-semibold mb-4">生成信息</h4><div className="space-y-3 text-sm"><div className="flex justify-between"><span className="text-gray-500">图片类型</span><span className="font-medium">{imageTypes.find(t => t.id === imageType).label}</span></div><div className="flex justify-between"><span className="text-gray-500">已生成</span><span className="font-medium">{generatedImages.length} 张</span></div></div><button onClick={handleGenerate} disabled={generating || !form.projectName} className={`w-full mt-4 py-3 rounded-xl font-bold transition ${generating || !form.projectName ? 'bg-gray-300 cursor-not-allowed' : 'bg-pink-600 text-white hover:bg-pink-700'}`}>{generating ? <><i className="fas fa-spinner fa-spin mr-2"></i>生成中...</> : <><i className="fas fa-magic mr-2"></i>AI生成图片</>}</button></div>
-                        </div>
+                        <div className="space-y-6"><div className="bg-white rounded-xl shadow p-6"><h4 className="font-semibold mb-4">操作</h4><button onClick={handleGenerate} disabled={generating || !prompt} className={`w-full py-3 rounded-xl font-bold transition ${generating || !prompt ? 'bg-gray-300 cursor-not-allowed' : 'bg-pink-600 text-white hover:bg-pink-700'}`}>{generating ? <><i className="fas fa-spinner fa-spin mr-2"></i>生成中...</> : <><i className="fas fa-magic mr-2"></i>生成图片</>}</button></div><div className="bg-white rounded-xl shadow p-6"><h4 className="font-semibold mb-3">生成记录</h4><div className="text-sm text-gray-500">已生成 {generatedImages.length} 张图片</div></div></div>
                     </div>
-                    {generatedImages.length > 0 && (<div className="mt-6 bg-white rounded-xl shadow p-6"><h3 className="font-semibold text-lg mb-4">生成结果</h3><div className="grid grid-cols-4 gap-4">{generatedImages.map(img => (<div key={img.id} className="border rounded-lg overflow-hidden"><div className="aspect-video bg-gray-100 flex items-center justify-center"><i className={`fas ${imageTypes.find(t => t.id === img.type)?.icon || 'fa-image'} text-4xl text-gray-300`}></i></div><div className="p-3"><div className="text-sm font-medium">{imageTypes.find(t => t.id === img.type)?.label}</div><div className="flex gap-2 mt-2"><button className="flex-1 px-2 py-1 bg-blue-50 text-blue-600 rounded text-xs"><i className="fas fa-eye mr-1"></i>预览</button><button className="flex-1 px-2 py-1 bg-green-50 text-green-600 rounded text-xs"><i className="fas fa-download mr-1"></i>下载</button></div></div></div>))}</div></div>)}
                 </div>
             );
         };
 
-        // ========== 模块11: 标书模板市场 ==========
+        // ========== TEMPLATE MODULE ==========
         const TemplateModule = () => {
-            const [activeCategory, setActiveCategory] = useState('document');
-            const [selectedTemplate, setSelectedTemplate] = useState(null);
-            const categories = [{ id: 'document', label: '精品文档模型', icon: 'fa-file-alt', color: 'blue' }, { id: 'ppt', label: '精品PPT模型', icon: 'fa-file-powerpoint', color: 'orange' }, { id: 'engineering', label: '工程技术标', icon: 'fa-hard-hat', color: 'yellow' }];
-            const templates = {
-                document: [{ id: 'd1', name: '蓝橙对照图表化标书模型', pages: '50页以内', style: '蓝橙配色', gradient: 'from-blue-500 to-orange-500' }, { id: 'd2', name: '淡雅图表技术标模型', pages: '50页以内', style: '淡雅图表', gradient: 'from-gray-400 to-blue-500' }, { id: 'd3', name: '活力橙红多图表标书模型', pages: '80页以内', style: '活力橙红', gradient: 'from-orange-500 to-red-500' }, { id: 'd4', name: '精美多彩表格标书模型', pages: '60页以内', style: '精美多彩', gradient: 'from-pink-500 via-purple-500 to-blue-500' }, { id: 'd5', name: '灰蓝清爽商务表格标书模型', pages: '50页以内', style: '灰蓝商务', gradient: 'from-gray-400 to-blue-400' }, { id: 'd6', name: '蓝色调图表标书模型', pages: '70页以内', style: '蓝色图表', gradient: 'from-blue-400 to-blue-600' }],
-                ppt: [{ id: 'p1', name: '蓝色商务汇报PPT', pages: '25页', style: '蓝色商务', gradient: 'from-blue-400 to-blue-600' }, { id: 'p2', name: '橙色项目展示PPT', pages: '30页', style: '橙色活力', gradient: 'from-orange-400 to-orange-600' }, { id: 'p3', name: '绿色清新汇报PPT', pages: '20页', style: '绿色清新', gradient: 'from-green-400 to-green-600' }],
-                engineering: [{ id: 'e1', name: '50页以内工程技术标模型', pages: '50页以内', style: '工程技术', gradient: 'from-yellow-400 to-yellow-600' }, { id: 'e2', name: '100页以内工程技术标模型', pages: '100页以内', style: '工程技术', gradient: 'from-yellow-500 to-orange-500' }, { id: 'e3', name: '目录只到四级的技术标模型', pages: '80页以内', style: '四级目录', gradient: 'from-yellow-400 to-amber-600' }, { id: 'e4', name: '食材采购标书模型', pages: '40页以内', style: '接地气', gradient: 'from-orange-400 to-red-400' }, { id: 'e5', name: '服务标书模型', pages: '60页以内', style: '服务类', gradient: 'from-blue-400 to-indigo-600' }, { id: 'e6', name: '蓝绿色图表化标书模型', pages: '70页以内', style: '蓝绿清新', gradient: 'from-cyan-400 to-teal-600' }, { id: 'e7', name: '工程设计模型', pages: '90页以内', style: '工程设计', gradient: 'from-purple-400 to-purple-600' }]
-            };
+            const [templates] = useState([
+                { id: 1, name: '工程施工投标文件模板', category: '工程类', downloads: 1256, desc: '适用于各类工程施工项目投标' },
+                { id: 2, name: '政府采购投标文件模板', category: '货物类', downloads: 892, desc: '适用于政府采购货物类项目' },
+                { id: 3, name: '信息化项目投标文件模板', category: '服务类', downloads: 634, desc: '适用于信息化建设服务项目' },
+                { id: 4, name: '装饰装修投标文件模板', category: '工程类', downloads: 445, desc: '适用于装饰装修工程项目' },
+                { id: 5, name: '设备采购投标文件模板', category: '货物类', downloads: 378, desc: '适用于大型设备采购项目' },
+                { id: 6, name: '咨询服务投标文件模板', category: '服务类', downloads: 267, desc: '适用于咨询服务类项目' }
+            ]);
+            const [activeCategory, setActiveCategory] = useState('all');
+            const categories = ['all', '工程类', '货物类', '服务类'];
+            const filtered = templates.filter(t => activeCategory === 'all' || t.category === activeCategory);
             return (
                 <div className="p-6 fade-in">
-                    <h2 className="text-2xl font-bold text-gray-800 mb-6"><i className="fas fa-palette mr-3 text-indigo-600"></i>AI标书模板市场</h2>
-                    <div className="bg-white rounded-xl shadow p-6 mb-6"><div className="grid grid-cols-3 gap-4">{categories.map(cat => (<div key={cat.id} onClick={() => setActiveCategory(cat.id)} className={`p-6 rounded-xl border-2 cursor-pointer transition ${activeCategory === cat.id ? 'border-blue-500 bg-blue-50' : 'border-gray-200 hover:border-gray-300'}`}><div className="w-12 h-12 rounded-lg bg-blue-100 flex items-center justify-center mb-4"><i className={`fas ${cat.icon} text-xl text-blue-600`}></i></div><h4 className="font-bold">{cat.label}</h4><p className="text-sm text-gray-500 mt-1">{templates[cat.id]?.length || 0} 个模板</p></div>))}</div></div>
-                    <div className="grid grid-cols-3 gap-6">{templates[activeCategory]?.map(t => (<div key={t.id} onClick={() => setSelectedTemplate(t)} className="bg-white rounded-xl shadow overflow-hidden cursor-pointer card-hover"><div className={`h-40 bg-gradient-to-br ${t.gradient} flex items-center justify-center`}><div className="bg-white bg-opacity-20 rounded-lg p-4 backdrop-blur-sm"><i className={`fas ${categories.find(c => c.id === activeCategory)?.icon || 'fa-file-alt'} text-4xl text-white`}></i></div></div><div className="p-4"><h4 className="font-bold mb-2">{t.name}</h4><div className="flex items-center justify-between text-sm text-gray-500"><span>{t.pages}</span><span className="text-indigo-600 font-medium">查看详情</span></div><div className="mt-2"><span className="px-2 py-1 bg-gray-100 rounded text-xs">{t.style}</span></div></div></div>))}</div>
-                    {selectedTemplate && (<div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-8"><div className="bg-white rounded-2xl max-w-3xl w-full max-h-[90vh] overflow-hidden" onClick={e => e.stopPropagation()}><div className="p-6 border-b flex items-center justify-between"><div><h3 className="text-xl font-bold">{selectedTemplate.name}</h3><p className="text-sm text-gray-500">{selectedTemplate.pages} | {selectedTemplate.style}</p></div><button onClick={() => setSelectedTemplate(null)} className="text-gray-500 hover:text-gray-700"><i className="fas fa-times text-xl"></i></button></div><div className="p-8 overflow-y-auto" style={{maxHeight: 'calc(90vh - 180px)'}}><div className={`h-60 bg-gradient-to-br ${selectedTemplate.gradient} rounded-xl flex items-center justify-center mb-6`}><div className="bg-white bg-opacity-20 rounded-xl p-8 backdrop-blur-sm text-center"><i className={`fas ${categories.find(c => c.id === activeCategory)?.icon || 'fa-file-alt'} text-6xl text-white mb-4`}></i><p className="text-white text-lg font-medium">{selectedTemplate.name}</p></div></div><div className="grid grid-cols-3 gap-4 text-center"><div className="p-4 bg-gray-50 rounded-lg"><div className="text-2xl font-bold text-indigo-600">{selectedTemplate.pages}</div><div className="text-sm text-gray-500">页数</div></div><div className="p-4 bg-gray-50 rounded-lg"><div className="text-2xl font-bold text-indigo-600">AI</div><div className="text-sm text-gray-500">生成方式</div></div><div className="p-4 bg-gray-50 rounded-lg"><div className="text-2xl font-bold text-indigo-600">即时</div><div className="text-sm text-gray-500">交付时间</div></div></div></div><div className="p-6 border-t bg-gray-50 flex justify-end gap-3"><button onClick={() => setSelectedTemplate(null)} className="px-6 py-2 border border-gray-300 rounded-lg hover:bg-gray-100">关闭</button><button className="px-6 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700"><i className="fas fa-magic mr-2"></i>使用此模板</button></div></div></div>)}
+                    <h2 className="text-2xl font-bold text-gray-800 mb-6"><i className="fas fa-palette mr-3 text-indigo-600"></i>标书模板</h2>
+                    <div className="flex gap-2 mb-6">{categories.map(cat => (<button key={cat} onClick={() => setActiveCategory(cat)} className={`px-4 py-2 rounded-lg text-sm font-medium transition ${activeCategory === cat ? 'bg-blue-600 text-white' : 'bg-white text-gray-600 hover:bg-gray-50 shadow-sm'}`}>{cat === 'all' ? '全部' : cat}</button>))}</div>
+                    <div className="grid grid-cols-3 gap-4">{filtered.map(t => (<div key={t.id} className="bg-white rounded-xl shadow p-5 card-hover"><div className="flex items-center mb-3"><div className="w-10 h-10 bg-indigo-100 rounded-lg flex items-center justify-center mr-3"><i className="fas fa-file-alt text-indigo-600"></i></div><div><h4 className="font-bold text-gray-800">{t.name}</h4><span className="text-xs text-gray-500">{t.category}</span></div></div><p className="text-sm text-gray-500 mb-3">{t.desc}</p><div className="flex items-center justify-between"><span className="text-xs text-gray-400"><i className="fas fa-download mr-1"></i>{t.downloads} 次下载</span><button className="px-3 py-1.5 bg-blue-50 text-blue-600 rounded-lg text-sm hover:bg-blue-100"><i className="fas fa-download mr-1"></i>使用</button></div></div>))}</div>
                 </div>
             );
         };
 
-        // ========== 主应用 ==========
+        // ========== SETTINGS MODULE ==========
+        const SettingsModule = () => {
+            const { companies, bids, projects } = useApp();
+            const [activeTab, setActiveTab] = useState('general');
+            const tabs = [{ id: 'general', label: '基本设置', icon: 'fa-cog' }, { id: 'data', label: '数据管理', icon: 'fa-database' }, { id: 'about', label: '关于', icon: 'fa-info-circle' }];
+            const clearData = (key) => { if (confirm('确定清除该数据？')) { localStorage.removeItem(key); window.location.reload(); } };
+            return (
+                <div className="p-6 fade-in">
+                    <h2 className="text-2xl font-bold text-gray-800 mb-6"><i className="fas fa-cog mr-3 text-gray-600"></i>系统设置</h2>
+                    <div className="bg-white rounded-xl shadow"><div className="flex border-b">{tabs.map(tab => (<button key={tab.id} onClick={() => setActiveTab(tab.id)} className={`flex items-center px-6 py-4 text-sm font-medium border-b-2 transition ${activeTab === tab.id ? 'border-blue-500 text-blue-600' : 'border-transparent text-gray-500 hover:text-gray-700'}`}><i className={`fas ${tab.icon} mr-2`}></i>{tab.label}</button>))}</div><div className="p-6">
+                    {activeTab === 'general' && (<div className="space-y-6"><div className="grid grid-cols-2 gap-6"><div><label className="block text-sm font-medium text-gray-700 mb-2">企业名称</label><input type="text" placeholder="请输入企业名称" className="w-full px-3 py-2 border rounded-lg" /></div><div><label className="block text-sm font-medium text-gray-700 mb-2">联系人</label><input type="text" placeholder="请输入联系人" className="w-full px-3 py-2 border rounded-lg" /></div><div><label className="block text-sm font-medium text-gray-700 mb-2">联系电话</label><input type="text" placeholder="请输入联系电话" className="w-full px-3 py-2 border rounded-lg" /></div><div><label className="block text-sm font-medium text-gray-700 mb-2">邮箱</label><input type="email" placeholder="请输入邮箱" className="w-full px-3 py-2 border rounded-lg" /></div></div><button className="px-6 py-2.5 bg-blue-600 text-white rounded-lg hover:bg-blue-700">保存设置</button></div>)}
+                    {activeTab === 'data' && (<div><div className="grid grid-cols-3 gap-4 mb-6"><div className="p-4 bg-blue-50 rounded-lg text-center"><div className="text-2xl font-bold text-blue-600">{companies.length}</div><div className="text-sm text-gray-500">企业信息</div></div><div className="p-4 bg-green-50 rounded-lg text-center"><div className="text-2xl font-bold text-green-600">{bids.length}</div><div className="text-sm text-gray-500">标书记录</div></div><div className="p-4 bg-purple-50 rounded-lg text-center"><div className="text-2xl font-bold text-purple-600">{projects.length}</div><div className="text-sm text-gray-500">项目记录</div></div></div><div className="space-y-3"><h4 className="font-semibold">数据管理</h4><div className="flex gap-3"><button onClick={() => clearData('bid_ai_companies')} className="px-4 py-2 bg-red-50 text-red-600 rounded-lg hover:bg-red-100 text-sm">清除企业数据</button><button onClick={() => clearData('bid_ai_bid_history')} className="px-4 py-2 bg-red-50 text-red-600 rounded-lg hover:bg-red-100 text-sm">清除标书数据</button><button onClick={() => clearData('bid_ai_projects')} className="px-4 py-2 bg-red-50 text-red-600 rounded-lg hover:bg-red-100 text-sm">清除项目数据</button><button onClick={() => clearData('bid_ai_knowledge')} className="px-4 py-2 bg-red-50 text-red-600 rounded-lg hover:bg-red-100 text-sm">清除知识库</button><button onClick={() => clearData('bid_ai_products')} className="px-4 py-2 bg-red-50 text-red-600 rounded-lg hover:bg-red-100 text-sm">清除产品库</button><button onClick={() => clearData('bid_ai_gallery')} className="px-4 py-2 bg-red-50 text-red-600 rounded-lg hover:bg-red-100 text-sm">清除图库</button></div></div></div>)}
+                    {activeTab === 'about' && (<div className="text-center py-8"><div className="w-20 h-20 bg-blue-600 rounded-2xl flex items-center justify-center mx-auto mb-4"><i className="fas fa-compass text-white text-3xl"></i></div><h3 className="text-2xl font-bold text-gray-800 mb-2">智标领航</h3><p className="text-gray-500 mb-4">AI智能招投标管理平台 v2.0</p><p className="text-sm text-gray-400">zblh.cn | &copy; 2024 All Rights Reserved</p></div>)}
+                    </div></div>
+                </div>
+            );
+        };
+
+        // ========== MAIN APP ==========
         const App = () => {
+            const [isLoggedIn, setIsLoggedIn] = useState(!!loadObject('bid_ai_user'));
             const [activeModule, setActiveModule] = useState('dashboard');
             const [sidebarOpen, setSidebarOpen] = useState(true);
             const [companies, setCompanies] = useState(loadData('bid_ai_companies'));
@@ -618,43 +738,32 @@
             const [bids, setBids] = useState(loadData('bid_ai_bid_history'));
             const [projects, setProjects] = useState(loadData('bid_ai_projects'));
             const contextValue = { companies, setCompanies, tenderData, setTenderData, bids, setBids, projects, setProjects };
-            const renderModule = () => {
-                switch (activeModule) {
-                    case 'dashboard': return <Dashboard setActiveModule={setActiveModule} />;
-                    case 'company': return <CompanyModule />;
-                    case 'tender': return <TenderModule />;
-                    case 'writing': return <WritingModule />;
-                    case 'chart': return <ChartModule />;
-                    case 'construction': return <ConstructionModule />;
-                    case 'layout': return <LayoutModule />;
-                    case 'imagegen': return <ImageGenModule />;
-                    case 'template': return <TemplateModule />;
-                    case 'check': return <CheckModule />;
-                    case 'project': return <ProjectModule />;
-                    case 'settings': return <SettingsModule />;
-                    default: return <Dashboard setActiveModule={setActiveModule} />;
-                }
-            };
+            const moduleMap = { dashboard: Dashboard, company: CompanyModule, tender: TenderModule, writing: WritingModule, check: CheckModule, business: BusinessModule, opportunities: OpportunitiesModule, knowledge: KnowledgeModule, products: ProductsModule, gallery: GalleryModule, mybids: MyBidsModule, project: ProjectModule, chart: ChartModule, construction: ConstructionModule, layout: LayoutModule, imagegen: ImageGenModule, template: TemplateModule, settings: SettingsModule };
+            const ModuleComponent = moduleMap[activeModule] || Dashboard;
+            const moduleNames = { dashboard: '首页概览', company: '企业资信库', tender: '招标文件解读', writing: '标书写作', check: '标书查重', business: '商务标助手', opportunities: '标讯商机', knowledge: '知识库', products: '产品库', gallery: '图库', mybids: '我的标书', project: '项目管理', chart: '图表生成', construction: '工程施工', layout: '平面布置图', imagegen: 'AI生图', template: '标书模板', settings: '系统设置' };
+            if (!isLoggedIn) return <LoginPage onLogin={() => setIsLoggedIn(true)} />;
             return (
                 <AppContext.Provider value={contextValue}>
                     <div className="flex min-h-screen">
                         <Sidebar activeModule={activeModule} setActiveModule={setActiveModule} sidebarOpen={sidebarOpen} setSidebarOpen={setSidebarOpen} />
-                        <div className="flex-1">
-                            <header className="h-16 bg-white shadow-sm flex items-center justify-between px-8">
-                                <h1 className="text-xl font-bold text-gray-800">招投标AI智能体</h1>
+                        <div className="flex-1 flex flex-col min-h-screen">
+                            <header className="h-16 bg-white shadow-sm flex items-center justify-between px-6 border-b border-gray-100">
+                                <div className="flex items-center"><h2 className="text-lg font-bold text-gray-800">{moduleNames[activeModule]}</h2></div>
                                 <div className="flex items-center gap-4">
-                                    <span className="px-3 py-1 bg-green-100 text-green-700 text-xs rounded-full">运行中</span>
-                                    <div className="w-8 h-8 bg-indigo-100 rounded-full flex items-center justify-center"><i className="fas fa-user text-indigo-600"></i></div>
+                                    <button className="relative p-2 text-gray-500 hover:text-gray-700"><i className="fas fa-bell"></i><span className="absolute top-1 right-1 w-2 h-2 bg-red-500 rounded-full"></span></button>
+                                    <div className="flex items-center gap-2"><div className="w-8 h-8 bg-blue-100 rounded-full flex items-center justify-center"><i className="fas fa-user text-blue-600 text-sm"></i></div><span className="text-sm font-medium text-gray-700">管理员</span></div>
+                                    <button onClick={() => { localStorage.removeItem('bid_ai_user'); setIsLoggedIn(false); }} className="text-sm text-gray-500 hover:text-red-500"><i className="fas fa-sign-out-alt mr-1"></i>退出</button>
                                 </div>
                             </header>
-                            <main className="bg-gray-100 min-h-[calc(100vh-4rem)]">{renderModule()}</main>
+                            <main className="flex-1 bg-gray-100 overflow-auto"><ModuleComponent setActiveModule={setActiveModule} /></main>
                         </div>
                     </div>
                 </AppContext.Provider>
             );
         };
 
-        ReactDOM.createRoot(document.getElementById('root')).render(<App />);
+        const root = ReactDOM.createRoot(document.getElementById('root'));
+        root.render(<App />);
     </script>
 </body>
 </html>
